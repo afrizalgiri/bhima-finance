@@ -46,7 +46,10 @@ Hanya berikan JSON, tanpa penjelasan tambahan.`;
     res.json({ success: true, data });
   } catch (error) {
     console.error('AI generate error:', error);
-    res.status(500).json({ success: false, message: 'Failed to generate text' });
+    if (error.status === 429) {
+      return res.status(429).json({ success: false, message: 'Batas request AI tercapai, tunggu 1 menit lalu coba lagi.' });
+    }
+    res.status(500).json({ success: false, message: 'Gagal generate teks AI' });
   }
 };
 

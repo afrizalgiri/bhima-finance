@@ -78,8 +78,9 @@ export default function SphPage() {
       });
       setForm(f => ({ ...f, openingText: r.data.data.openingText, closingText: r.data.data.closingText }));
       toast({ title: 'Teks berhasil digenerate oleh AI' });
-    } catch {
-      toast({ title: 'Gagal generate teks AI', variant: 'destructive' });
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal generate teks AI';
+      toast({ title: msg, variant: 'destructive' });
     } finally { setGeneratingAi(false); }
   };
 
