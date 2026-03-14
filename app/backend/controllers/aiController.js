@@ -1,6 +1,6 @@
-const Anthropic = require('@anthropic-ai/sdk');
+const OpenAI = require('openai');
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const generateDocText = async (req, res) => {
   try {
@@ -11,14 +11,13 @@ const generateDocText = async (req, res) => {
     }
 
     const itemList = items.map(i => `- ${i.name}${i.description ? ` (${i.description})` : ''}${i.unit ? `, satuan: ${i.unit}` : ''}`).join('\n');
-    const isInvoice = docType === 'invoice';
 
     const prompt = `Kamu adalah asisten profesional untuk perusahaan keuangan Indonesia.
-Buatkan paragraf pembuka dan penutup untuk ${isInvoice ? 'invoice/tagihan' : 'Surat Penawaran Harga (SPH)'} dalam Bahasa Indonesia yang formal dan profesional.
+Buatkan paragraf pembuka dan penutup untuk Surat Penawaran Harga (SPH) dalam Bahasa Indonesia yang formal dan profesional.
 
 Perusahaan pengirim: ${companyName || 'kami'}
 Klien: ${clientName || 'Bapak/Ibu'}
-Item yang ${isInvoice ? 'ditagihkan' : 'ditawarkan'}:
+Item yang ditawarkan:
 ${itemList}
 
 Perhatikan jenis item:
@@ -34,19 +33,15 @@ Berikan response dalam format JSON:
 
 Hanya berikan JSON, tanpa penjelasan tambahan.`;
 
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
       max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
     });
 
-    const text = message.content[0].text.trim();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return res.status(500).json({ success: false, message: 'AI response format error' });
-    }
-
-    const result = JSON.parse(jsonMatch[0]);
+    const text = completion.choices[0].message.content.trim();
+    const result = JSON.parse(text);
     res.json({ success: true, data: result });
   } catch (error) {
     console.error('AI generate error:', error);
