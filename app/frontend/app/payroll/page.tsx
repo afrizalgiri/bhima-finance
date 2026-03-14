@@ -9,17 +9,18 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { toast } from '../../components/ui/toaster';
 import { Plus, Edit, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
 const fmt = (n: number | null) => n === null ? '****' : new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
 
-const emptyForm = { userId: '', month: new Date().getMonth() + 1, year: new Date().getFullYear(), baseSalary: '', allowances: '0', deductions: '0', notes: '' };
+const emptyForm = { employeeName: '', month: new Date().getMonth() + 1, year: new Date().getFullYear(), baseSalary: '', allowances: '0', deductions: '0', notes: '' };
 
 export default function PayrollPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [payrolls, setPayrolls] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
@@ -29,28 +30,27 @@ export default function PayrollPage() {
   const [filterMonth, setFilterMonth] = useState(0);
 
   const isAdmin = user?.role === 'ADMIN';
-  const canSeeAmounts = isAdmin || user?.canViewSalary;
 
-  useEffect(() => { fetchAll(); }, [filterYear, filterMonth]);
+  useEffect(() => {
+    if (!user) return;
+    if (!isAdmin && !user.canViewSalary) { router.push('/dashboard'); return; }
+    fetchAll();
+  }, [user, filterYear, filterMonth]);
 
   const fetchAll = async () => {
     setLoading(true);
     try {
       const params: any = { year: filterYear };
       if (filterMonth > 0) params.month = filterMonth;
-      const [pr] = await Promise.all([api.get('/payroll', { params })]);
-      setPayrolls(pr.data.data);
-      if (isAdmin && users.length === 0) {
-        const ur = await api.get('/users');
-        setUsers(ur.data.data);
-      }
+      const r = await api.get('/payroll', { params });
+      setPayrolls(r.data.data);
     } catch { } finally { setLoading(false); }
   };
 
   const openAdd = () => { setEditing(null); setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (p: any) => {
     setEditing(p);
-    setForm({ userId: p.userId, month: p.month, year: p.year, baseSalary: String(p.baseSalary), allowances: String(p.allowances), deductions: String(p.deductions), notes: p.notes || '' });
+    setForm({ employeeName: p.employeeName, month: p.month, year: p.year, baseSalary: String(p.baseSalary), allowances: String(p.allowances), deductions: String(p.deductions), notes: p.notes || '' });
     setDialogOpen(true);
   };
 
@@ -75,8 +75,7 @@ export default function PayrollPage() {
     if (!confirm(`Hapus slip gaji ${name}?`)) return;
     try {
       await api.delete(`/payroll/${id}`);
-      toast({ title: 'Slip gaji dihapus' });
-      fetchAll();
+      toast({ title: 'Slip gaji dihapus' }); fetchAll();
     } catch { toast({ title: 'Gagal menghapus', variant: 'destructive' }); }
   };
 
@@ -87,7 +86,7 @@ export default function PayrollPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Slip Gaji</h1>
-          <p className="text-gray-500 text-sm">{isAdmin ? 'Kelola slip gaji karyawan' : 'Slip gaji kamu'}</p>
+          <p className="text-gray-500 text-sm">Kelola slip gaji karyawan</p>
         </div>
         {isAdmin && <Button onClick={openAdd} className="bg-blue-600 hover:bg-blue-700"><Plus size={16} />Buat Slip Gaji</Button>}
       </div>
@@ -103,12 +102,6 @@ export default function PayrollPage() {
           {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
         </select>
       </div>
-
-      {!canSeeAmounts && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-sm text-yellow-800">
-          Angka gaji tersembunyi. Hubungi admin untuk mendapatkan akses melihat jumlah gaji.
-        </div>
-      )}
 
       <Card>
         <CardContent className="p-0">
@@ -132,17 +125,17 @@ export default function PayrollPage() {
                   <tr><td colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-gray-400">Belum ada data slip gaji</td></tr>
                 ) : payrolls.map(p => (
                   <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-2.5 px-4 font-medium">{p.user?.name}</td>
+                    <td className="py-2.5 px-4 font-medium">{p.employeeName}</td>
                     <td className="py-2.5 px-4 text-gray-600">{MONTHS[p.month - 1]} {p.year}</td>
                     <td className="py-2.5 px-4 text-right">{fmt(p.baseSalary)}</td>
                     <td className="py-2.5 px-4 text-right text-green-600">{fmt(p.allowances)}</td>
-                    <td className="py-2.5 px-4 text-right text-red-500">{p.deductions !== null ? (p.deductions > 0 ? '-' + fmt(p.deductions) : fmt(0)) : '****'}</td>
+                    <td className="py-2.5 px-4 text-right text-red-500">{p.deductions > 0 ? '-' + fmt(p.deductions) : fmt(0)}</td>
                     <td className="py-2.5 px-4 text-right font-bold text-blue-700">{fmt(p.netSalary)}</td>
                     {isAdmin && (
                       <td className="py-2.5 px-4">
                         <div className="flex gap-1 justify-end">
                           <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit size={14} /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => remove(p.id, p.user?.name + ' ' + MONTHS[p.month-1])} className="text-red-500 hover:text-red-700"><Trash2 size={14} /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => remove(p.id, p.employeeName + ' ' + MONTHS[p.month-1])} className="text-red-500 hover:text-red-700"><Trash2 size={14} /></Button>
                         </div>
                       </td>
                     )}
@@ -159,16 +152,10 @@ export default function PayrollPage() {
           <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle>{editing ? 'Edit Slip Gaji' : 'Buat Slip Gaji'}</DialogTitle></DialogHeader>
             <form onSubmit={save} className="space-y-3">
-              {!editing && (
-                <div>
-                  <Label>Karyawan *</Label>
-                  <select value={form.userId} onChange={e => setForm({...form, userId: e.target.value})} required
-                    className="mt-1 w-full rounded-md border border-input px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                    <option value="">-- Pilih Karyawan --</option>
-                    {users.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                  </select>
-                </div>
-              )}
+              <div>
+                <Label>Nama Karyawan *</Label>
+                <Input value={form.employeeName} onChange={e => setForm({...form, employeeName: e.target.value})} required placeholder="Contoh: Budi Santoso" className="mt-1" />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Bulan *</Label>
@@ -182,7 +169,7 @@ export default function PayrollPage() {
                   <Input type="number" value={form.year} onChange={e => setForm({...form, year: parseInt(e.target.value)})} required className="mt-1" />
                 </div>
               </div>
-              <div><Label>Gaji Pokok (Rp) *</Label><Input type="number" min="0" value={form.baseSalary} onChange={e => setForm({...form, baseSalary: e.target.value})} required className="mt-1" /></div>
+              <div><Label>Gaji Pokok (Rp) *</Label><Input type="number" min="0" value={form.baseSalary} onChange={e => setForm({...form, baseSalary: e.target.value})} required placeholder="0" className="mt-1" /></div>
               <div><Label>Tunjangan (Rp)</Label><Input type="number" min="0" value={form.allowances} onChange={e => setForm({...form, allowances: e.target.value})} className="mt-1" /></div>
               <div><Label>Potongan (Rp)</Label><Input type="number" min="0" value={form.deductions} onChange={e => setForm({...form, deductions: e.target.value})} className="mt-1" /></div>
               <div className="bg-blue-50 rounded-md p-3 text-sm">

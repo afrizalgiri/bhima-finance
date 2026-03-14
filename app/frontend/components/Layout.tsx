@@ -76,13 +76,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               Riwayat Aktivitas
             </Link>
           )}
-          <Link href="/payroll" onClick={() => setSidebarOpen(false)}
-            className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
-              pathname === '/payroll' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
-            )}>
-            <Banknote size={18} />
-            Slip Gaji
-          </Link>
+          {(user.role === 'ADMIN' || user.canViewSalary) && (
+            <Link href="/payroll" onClick={() => setSidebarOpen(false)}
+              className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
+                pathname === '/payroll' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
+              )}>
+              <Banknote size={18} />
+              Slip Gaji
+            </Link>
+          )}
           {user.role === 'ADMIN' && (
             <>
               <div className="px-3 pt-3 pb-1 text-xs text-gray-400 uppercase tracking-wide">Admin</div>
