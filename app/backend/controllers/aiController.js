@@ -1,10 +1,10 @@
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const generateDocText = async (req, res) => {
   try {
-    const { items, docType = 'sph', clientName, companyName } = req.body;
+    const { items, clientName, companyName } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Items required' });
@@ -33,16 +33,17 @@ Berikan response dalam format JSON:
 
 Hanya berikan JSON, tanpa penjelasan tambahan.`;
 
-    const completion = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 500,
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-    });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim();
 
-    const text = completion.choices[0].message.content.trim();
-    const result = JSON.parse(text);
-    res.json({ success: true, data: result });
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return res.status(500).json({ success: false, message: 'AI response format error' });
+    }
+
+    const data = JSON.parse(jsonMatch[0]);
+    res.json({ success: true, data });
   } catch (error) {
     console.error('AI generate error:', error);
     res.status(500).json({ success: false, message: 'Failed to generate text' });
