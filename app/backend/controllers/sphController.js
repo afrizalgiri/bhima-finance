@@ -1,8 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
 const { generateSphNumber } = require('../utils/numberGenerator');
 const { generateSphPdf } = require('../services/pdfService');
-
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const getAll = async (req, res) => {
   try {

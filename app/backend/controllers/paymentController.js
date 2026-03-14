@@ -1,7 +1,6 @@
 const { validationResult } = require('express-validator');
-const { PrismaClient, Prisma } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const { Prisma } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 
 const updateInvoiceStatus = async (invoiceId) => {
   const invoice = await prisma.invoice.findUnique({
