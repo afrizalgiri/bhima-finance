@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import {
   LayoutDashboard, Users, Package, FileText, Receipt,
-  CreditCard, DollarSign, BarChart3, Settings, LogOut, Menu, X
+  CreditCard, DollarSign, BarChart3, Settings, LogOut, Menu, X, UserCog
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -66,6 +66,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          {user.role === 'ADMIN' && (
+            <>
+              <div className="px-3 pt-3 pb-1 text-xs text-gray-400 uppercase tracking-wide">Admin</div>
+              <Link href="/users" onClick={() => setSidebarOpen(false)}
+                className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
+                  pathname === '/users' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
+                )}>
+                <UserCog size={18} />
+                Manajemen User
+              </Link>
+            </>
+          )}
         </nav>
 
         <div className="p-3 border-t border-gray-200">
