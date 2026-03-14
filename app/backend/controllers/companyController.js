@@ -51,6 +51,15 @@ const uploadLogo = async (req, res) => {
   }
 };
 
+const getPublicLogo = async (req, res) => {
+  try {
+    const company = await prisma.companySetting.findFirst({ select: { logoUrl: true, name: true } });
+    res.json({ logoUrl: company?.logoUrl || null, name: company?.name || 'Bhima Finance' });
+  } catch {
+    res.status(500).json({ logoUrl: null });
+  }
+};
+
 const exportBackup = async (req, res) => {
   try {
     const [company, clients, products, sphs, invoices, payments, expenses] = await Promise.all([
@@ -79,4 +88,4 @@ const exportBackup = async (req, res) => {
   }
 };
 
-module.exports = { getSettings, updateSettings, uploadLogo, exportBackup };
+module.exports = { getSettings, updateSettings, uploadLogo, exportBackup, getPublicLogo };

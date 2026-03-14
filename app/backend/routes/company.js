@@ -21,6 +21,9 @@ const upload = multer({
   },
 });
 
+// Public endpoint - hanya logo URL, tanpa data sensitif
+router.get('/public-logo', ctrl.getPublicLogo);
+
 router.use(authenticate);
 router.get('/', ctrl.getSettings);
 router.put('/', ctrl.updateSettings);
