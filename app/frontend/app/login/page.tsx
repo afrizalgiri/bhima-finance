@@ -37,7 +37,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@bhimafinance.com" required className="mt-1" />
+            <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required className="mt-1" />
           </div>
           <div>
             <Label htmlFor="password">Password</Label>
