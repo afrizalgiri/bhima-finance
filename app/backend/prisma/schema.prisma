@@ -1,0 +1,185 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("STAFF")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model CompanySetting {
+  id               String   @id @default(uuid())
+  name             String
+  address          String
+  email            String
+  phone            String
+  logoUrl          String?
+  website          String?
+  taxNumber        String?
+  bankName         String?
+  bankAccount      String?
+  bankHolder       String?
+  docNameSph       String?
+  docPrefixSph     String?
+  docNameInvoice   String?
+  docPrefixInvoice String?
+  docNameExpense   String?
+  docPrefixExpense String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("company_settings")
+}
+
+model Client {
+  id        String    @id @default(uuid())
+  name      String
+  address   String
+  email     String?
+  phone     String?
+  pic       String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  sphs      Sph[]
+  invoices  Invoice[]
+
+  @@map("clients")
+}
+
+model Product {
+  id           String        @id @default(uuid())
+  name         String
+  description  String?
+  price        Float         @default(0)
+  unit         String        @default("pcs")
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  sphItems     SphItem[]
+  invoiceItems InvoiceItem[]
+
+  @@map("products")
+}
+
+model Sph {
+  id          String    @id @default(uuid())
+  number      String    @unique
+  date        DateTime
+  validUntil  DateTime?
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id])
+  items       SphItem[]
+  subtotal    Float     @default(0)
+  taxRate     Float     @default(0)
+  taxAmount   Float     @default(0)
+  total       Float     @default(0)
+  notes       String?
+  status      String    @default("DRAFT")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("sphs")
+}
+
+model SphItem {
+  id          String   @id @default(uuid())
+  sphId       String
+  sph         Sph      @relation(fields: [sphId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  name        String
+  description String?
+  quantity    Float    @default(1)
+  unit        String   @default("pcs")
+  price       Float    @default(0)
+  total       Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("sph_items")
+}
+
+model Invoice {
+  id          String        @id @default(uuid())
+  number      String        @unique
+  date        DateTime
+  dueDate     DateTime
+  clientId    String
+  client      Client        @relation(fields: [clientId], references: [id])
+  items       InvoiceItem[]
+  subtotal    Float         @default(0)
+  taxRate     Float         @default(0)
+  taxAmount   Float         @default(0)
+  total       Float         @default(0)
+  paidAmount  Float         @default(0)
+  notes       String?
+  status      String        @default("UNPAID")
+  payments    Payment[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  name        String
+  description String?
+  quantity    Float    @default(1)
+  unit        String   @default("pcs")
+  price       Float    @default(0)
+  total       Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id        String   @id @default(uuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  amount    Float    @default(0)
+  date      DateTime
+  method    String   @default("TRANSFER")
+  reference String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payments")
+}
+
+model Expense {
+  id         String   @id @default(uuid())
+  date       DateTime
+  name       String
+  category   String
+  amount     Float    @default(0)
+  department String?
+  requestBy  String?
+  notes      String?
+  receipt    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("expenses")
+}

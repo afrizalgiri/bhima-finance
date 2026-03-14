@@ -1,0 +1,27 @@
+# Dependencies
+app/backend/node_modules/
+app/frontend/node_modules/
+
+# Environment variables (JANGAN diupload - berisi password!)
+app/backend/.env
+app/frontend/.env.local
+app/frontend/.env.production
+
+# Database lokal (SQLite)
+app/backend/prisma/database.db
+app/backend/prisma/database.db-journal
+
+# Build artifacts
+app/frontend/.next/
+app/frontend/out/
+
+# Uploads (file yang diupload user)
+app/backend/uploads/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

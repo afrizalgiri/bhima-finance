@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma db push --accept-data-loss)",
+      "Bash(sc query state= all)",
+      "Bash(findstr /i \"postgre\")",
+      "Bash(node prisma/seed.js)",
+      "Bash(npm run dev)",
+      "Bash(npm install)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -s http://localhost:5000/api/health)",
+      "Bash(rm -f \"SETUP.bat\" \"JALANKAN.bat\" \"JALANKAN SAJA.bat\" \"SETUP & JALANKAN.bat\" \"start.bat\" \"setup.bat\" \"1 - BACKEND.bat\" \"2 - FRONTEND.bat\")",
+      "Bash(ls *.bat *.vbs)",
+      "Bash(curl -s http://localhost:5000/api/dashboard)",
+      "Bash(netstat -ano)",
+      "Read(//c/xampp/htdocs/bhima finance/**)",
+      "Bash(xargs -I{} taskkill //PID {} //F)",
+      "Bash(npx prisma db push --force-reset)",
+      "Bash(node -e \"const {PrismaClient}=require\\(''@prisma/client''\\);const p=new PrismaClient\\(\\);p.expense.findFirst\\(\\).then\\(r=>console.log\\(JSON.stringify\\(r\\)\\)\\).catch\\(e=>console.log\\(''ERR:'',e.message\\)\\).finally\\(\\(\\)=>p.$disconnect\\(\\)\\)\")",
+      "Bash(node --input-type=commonjs:*)",
+      "Bash(npx prisma db push)",
+      "Bash(npx prisma db push --skip-generate)",
+      "Bash(npx prisma generate)",
+      "Bash(cmd /c \"for /f \"\"tokens=5\"\" %p in \\(''netstat -ano ^| findstr \"\":5000 \"\"''\\) do taskkill /PID %p /F\")"
+    ]
+  }
+}
