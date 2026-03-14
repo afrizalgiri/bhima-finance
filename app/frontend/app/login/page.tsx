@@ -37,11 +37,11 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required className="mt-1" />
+            <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="off" className="mt-1" />
           </div>
           <div>
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required className="mt-1" />
+            <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required autoComplete="off" className="mt-1" />
           </div>
           <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
             {loading ? 'Masuk...' : 'Masuk'}
