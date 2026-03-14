@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '../../lib/api';
+
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -19,6 +21,7 @@ export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [signatures, setSignatures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialog, setViewDialog] = useState(false);
@@ -31,6 +34,7 @@ export default function InvoicesPage() {
     taxRate: '0',
     notes: '',
     headerColor: '#0f766e',
+    signatureId: '',
   });
   const [items, setItems] = useState<Item[]>([{ ...emptyItem }]);
   const [saving, setSaving] = useState(false);
@@ -47,14 +51,16 @@ export default function InvoicesPage() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [ir, cr, pr] = await Promise.all([
+      const [ir, cr, pr, sigr] = await Promise.all([
         api.get('/invoices', { params: { limit: 100 } }),
         api.get('/clients'),
         api.get('/products'),
+        api.get('/signatures'),
       ]);
       setInvoices(ir.data.data);
       setClients(cr.data.data);
       setProducts(pr.data.data);
+      setSignatures(sigr.data.data);
     } finally { setLoading(false); }
   };
 
@@ -86,6 +92,7 @@ export default function InvoicesPage() {
       await api.post('/invoices', {
         ...form, taxRate: parseFloat(form.taxRate), items,
         headerColor: form.headerColor || null,
+        signatureId: form.signatureId || null,
       });
       toast({ title: 'Invoice berhasil dibuat' });
       setDialogOpen(false); fetchAll();
@@ -150,7 +157,7 @@ export default function InvoicesPage() {
 
   const openCreate = () => {
     setItems([{ ...emptyItem }]);
-    setForm({ clientId: '', date: new Date().toISOString().split('T')[0], dueDate: '', taxRate: '0', notes: '', headerColor: '#0f766e' });
+    setForm({ clientId: '', date: new Date().toISOString().split('T')[0], dueDate: '', taxRate: '0', notes: '', headerColor: '#0f766e', signatureId: '' });
     setDialogOpen(true);
   };
 
@@ -274,6 +281,27 @@ export default function InvoicesPage() {
                 className="text-xs text-blue-600 hover:underline">Reset</button>
             </div>
 
+            {/* Signature Picker */}
+            <div>
+              <Label>Tanda Tangan Digital</Label>
+              <select value={form.signatureId} onChange={e => setForm({...form, signatureId: e.target.value})}
+                className="mt-1 w-full rounded-md border border-input px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                <option value="">-- Tanpa TTD --</option>
+                {signatures.map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.name}{s.title ? ` (${s.title})` : ''}</option>
+                ))}
+              </select>
+              {form.signatureId && (() => {
+                const sig = signatures.find((s: any) => s.id === form.signatureId);
+                return sig ? (
+                  <div className="mt-2 flex items-center gap-2 p-2 bg-gray-50 rounded border border-gray-100">
+                    <img src={`${API_BASE}${sig.imageUrl}`} alt={sig.name} className="h-10 object-contain" />
+                    <span className="text-xs text-gray-600">{sig.name}</span>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div><Label>PPN (%)</Label><Input type="number" min="0" max="100" value={form.taxRate} onChange={e => setForm({...form, taxRate: e.target.value})} className="mt-1" /></div>
               <div className="flex flex-col justify-end text-right">
@@ -363,6 +391,16 @@ export default function InvoicesPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+              {selected.signature && (
+                <div className="flex justify-end pt-2">
+                  <div className="text-center">
+                    <div className="text-xs text-gray-500 mb-1">Hormat kami,</div>
+                    <img src={`${API_BASE}${selected.signature.imageUrl}`} alt={selected.signature.name} className="h-14 object-contain mx-auto" />
+                    <div className="border-t border-gray-400 mt-1 pt-1 text-xs font-semibold">{selected.signature.name}</div>
+                    {selected.signature.title && <div className="text-xs text-gray-500">{selected.signature.title}</div>}
+                  </div>
                 </div>
               )}
             </div>

@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import {
   LayoutDashboard, Users, Package, FileText, Receipt,
   CreditCard, DollarSign, BarChart3, Settings, LogOut, Menu, X, UserCog,
-  History, Banknote
+  History, Banknote, PenLine
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -94,6 +94,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 )}>
                 <UserCog size={18} />
                 Manajemen User
+              </Link>
+              <Link href="/signatures" onClick={() => setSidebarOpen(false)}
+                className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
+                  pathname === '/signatures' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
+                )}>
+                <PenLine size={18} />
+                Tanda Tangan Digital
               </Link>
             </>
           )}

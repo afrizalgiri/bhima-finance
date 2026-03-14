@@ -29,6 +29,13 @@ function getLogoBuffer(company) {
   return null;
 }
 
+function getSignatureImagePath(signature) {
+  if (!signature?.imageUrl) return null;
+  const p = path.join(__dirname, '..', signature.imageUrl);
+  if (fs.existsSync(p)) return p;
+  return null;
+}
+
 function buildPdf(cb) {
   const doc = new PDFDocument({ size: 'A4', margin: M });
   const bufs = [];
@@ -45,12 +52,12 @@ const generateSphPdf = (sph, company, docName = 'Surat Penawaran Harga') => new 
   const doc = buildPdf((err, buf) => err ? reject(err) : resolve(buf));
 
   const logo = getLogoBuffer(company);
+  const sigImage = getSignatureImagePath(sph.signature);
   const NAVY = '#1a3557';
   const GOLD = '#c9a84c';
   const HEADER_COLOR = sph.headerColor || NAVY;
 
   // ── KOP SURAT ─────────────────────────────────────
-  // Garis atas kop (dua garis tebal-tipis)
   doc.rect(M, M, CW, 4).fillColor(NAVY).fill();
   doc.rect(M, M + 6, CW, 1.5).fillColor(GOLD).fill();
 
@@ -209,17 +216,36 @@ const generateSphPdf = (sph, company, docName = 'Surat Penawaran Harga') => new 
   y = doc.y + 18;
 
   // ── TANDA TANGAN ──────────────────────────────────
-  const sigX = PAGE_W - M - 140;
+  const sigX = PAGE_W - M - 150;
+  const signerName = sph.signature?.name || '';
+  const signerTitle = sph.signature?.title || sph.signerTitle || 'Finance Department';
+
   doc.fontSize(9).font('Helvetica').fillColor('#333')
-    .text('Hormat kami,', sigX, y, { width: 140, align: 'center' });
+    .text('Hormat kami,', sigX, y, { width: 150, align: 'center' });
   y = doc.y + 2;
   doc.fontSize(9).font('Helvetica-Bold').fillColor(NAVY)
-    .text(company?.name || '', sigX, y, { width: 140, align: 'center' });
-  y = doc.y + 40;
-  doc.moveTo(sigX, y).lineTo(sigX + 140, y).lineWidth(0.8).strokeColor('#333').stroke();
+    .text(company?.name || '', sigX, y, { width: 150, align: 'center' });
+  y = doc.y + 6;
+
+  // Signature image
+  if (sigImage) {
+    try {
+      doc.image(sigImage, sigX + 15, y, { width: 120, height: 50, fit: [120, 50] });
+    } catch (e) {}
+    y += 54;
+  } else {
+    y += 44;
+  }
+
+  doc.moveTo(sigX, y).lineTo(sigX + 150, y).lineWidth(0.8).strokeColor('#333').stroke();
   y += 4;
+  if (signerName) {
+    doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#222')
+      .text(signerName, sigX, y, { width: 150, align: 'center' });
+    y = doc.y + 2;
+  }
   doc.fontSize(8).font('Helvetica').fillColor('#555')
-    .text(sph.signerTitle || 'Finance Department', sigX, y, { width: 140, align: 'center' });
+    .text(signerTitle, sigX, y, { width: 150, align: 'center' });
 
   // Garis bawah halaman
   doc.rect(M, PAGE_H - M - 8, CW, 1.5).fillColor(GOLD).fill();
@@ -235,6 +261,7 @@ const generateInvoicePdf = (invoice, company, docName = 'INVOICE') => new Promis
   const doc = buildPdf((err, buf) => err ? reject(err) : resolve(buf));
 
   const logo = getLogoBuffer(company);
+  const sigImage = getSignatureImagePath(invoice.signature);
   const TEAL = '#0f766e';
   const TEAL_DARK = '#134e4a';
   const TEAL_LIGHT = '#f0fdfa';
@@ -244,7 +271,6 @@ const generateInvoicePdf = (invoice, company, docName = 'INVOICE') => new Promis
   const statusColor = { UNPAID: '#dc2626', PARTIAL: '#d97706', PAID: '#16a34a', OVERDUE: '#dc2626' };
 
   // ── HEADER INVOICE ────────────────────────────────
-  // Blok kiri — info perusahaan
   let headerY = M;
   if (logo) {
     try { doc.image(logo, M, headerY, { height: 50, fit: [80, 50] }); headerY += 4; } catch (e) {}
@@ -270,7 +296,6 @@ const generateInvoicePdf = (invoice, company, docName = 'INVOICE') => new Promis
     .text(sl, rightX + 200 - 120, doc.y + 8, { width: 120, align: 'center' });
 
   const infoY = doc.y + 14;
-  // Detail invoice (kanan)
   const infoPairs = [
     ['No. Invoice', invoice.number],
     ['Tanggal', formatDate(invoice.date)],
@@ -382,12 +407,48 @@ const generateInvoicePdf = (invoice, company, docName = 'INVOICE') => new Promis
     y = doc.y + 10;
   }
 
+  // ── TANDA TANGAN ─────────────────────────────────
+  if (invoice.signature) {
+    const signerName = invoice.signature.name || '';
+    const signerTitle = invoice.signature.title || '';
+    const sigX = PAGE_W - M - 150;
+
+    y += 6;
+    doc.fontSize(9).font('Helvetica').fillColor('#555')
+      .text('Hormat kami,', sigX, y, { width: 150, align: 'center' });
+    y = doc.y + 2;
+    doc.fontSize(9).font('Helvetica-Bold').fillColor(TEAL_DARK)
+      .text(company?.name || '', sigX, y, { width: 150, align: 'center' });
+    y = doc.y + 6;
+
+    if (sigImage) {
+      try {
+        doc.image(sigImage, sigX + 15, y, { width: 120, height: 50, fit: [120, 50] });
+      } catch (e) {}
+      y += 54;
+    } else {
+      y += 44;
+    }
+
+    doc.moveTo(sigX, y).lineTo(sigX + 150, y).lineWidth(0.8).strokeColor('#aaa').stroke();
+    y += 4;
+    if (signerName) {
+      doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#222')
+        .text(signerName, sigX, y, { width: 150, align: 'center' });
+      y = doc.y + 2;
+    }
+    if (signerTitle) {
+      doc.fontSize(8).font('Helvetica').fillColor('#555')
+        .text(signerTitle, sigX, y, { width: 150, align: 'center' });
+    }
+    y += 16;
+  }
+
   // ── FOOTER ────────────────────────────────────────
-  const footerY = PAGE_H - M - 55;
+  const footerY = PAGE_H - M - 40;
   doc.rect(M, footerY, CW, 1).fillColor('#ccc').fill();
   doc.fontSize(7.5).font('Helvetica').fillColor('#888')
-    .text('Dokumen ini dibuat secara elektronik dan sah tanpa tanda tangan.', M, footerY + 6, { width: CW, align: 'center' })
-    .text(`${company?.name || ''} | ${company?.email || ''} | ${company?.phone || ''}`, M, footerY + 16, { width: CW, align: 'center' });
+    .text(`${company?.name || ''} | ${company?.email || ''} | ${company?.phone || ''}`, M, footerY + 8, { width: CW, align: 'center' });
 
   doc.end();
 });
@@ -435,7 +496,6 @@ const generateExpensePdf = (expenses, company, filters, docName = 'Bukti Pengelu
   y = doc.y + 14;
 
   // ── INFO DOKUMEN ───────────────────────────────────
-  // Kiri
   const lx = M, rx = M + CW / 2 + 10;
   const fw = CW / 2 - 20;
 
@@ -515,19 +575,13 @@ const generateExpensePdf = (expenses, company, filters, docName = 'Bukti Pengelu
   ];
 
   sigPositions.forEach(({ x, label, sublabel }) => {
-    // Box tanda tangan
     doc.rect(x, y, sigW, 75).fillColor('#fafafa').fill();
     doc.rect(x, y, sigW, 75).strokeColor('#ccc').lineWidth(0.5).stroke();
-
-    // Header box
     doc.rect(x, y, sigW, 18).fillColor(NAVY).fill();
     doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#fff')
       .text(label, x + 4, y + 5, { width: sigW - 8, align: 'center' });
-
     doc.fontSize(7.5).font('Helvetica').fillColor('#888')
       .text(sublabel, x + 4, y + 21, { width: sigW - 8, align: 'center' });
-
-    // Garis tanda tangan
     doc.moveTo(x + 10, y + 65).lineTo(x + sigW - 10, y + 65).lineWidth(0.8).strokeColor('#999').stroke();
     doc.fontSize(7.5).font('Helvetica').fillColor('#888')
       .text('(                                            )', x + 4, y + 67, { width: sigW - 8, align: 'center' });

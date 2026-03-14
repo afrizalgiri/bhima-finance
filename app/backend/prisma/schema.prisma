@@ -110,26 +110,41 @@ model Product {
   @@map("products")
 }
 
+model Signature {
+  id        String    @id @default(uuid())
+  name      String
+  title     String?
+  imageUrl  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  sphs      Sph[]
+  invoices  Invoice[]
+
+  @@map("signatures")
+}
+
 model Sph {
-  id           String    @id @default(uuid())
-  number       String    @unique
+  id           String     @id @default(uuid())
+  number       String     @unique
   date         DateTime
   validUntil   DateTime?
   clientId     String
-  client       Client    @relation(fields: [clientId], references: [id])
+  client       Client     @relation(fields: [clientId], references: [id])
   items        SphItem[]
-  subtotal     Float     @default(0)
-  taxRate      Float     @default(0)
-  taxAmount    Float     @default(0)
-  total        Float     @default(0)
+  subtotal     Float      @default(0)
+  taxRate      Float      @default(0)
+  taxAmount    Float      @default(0)
+  total        Float      @default(0)
   notes        String?
-  status       String    @default("DRAFT")
+  status       String     @default("DRAFT")
   openingText  String?
   closingText  String?
   headerColor  String?
   signerTitle  String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  signatureId  String?
+  signature    Signature? @relation(fields: [signatureId], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   @@map("sphs")
 }
@@ -171,6 +186,8 @@ model Invoice {
   openingText  String?
   closingText  String?
   headerColor  String?
+  signatureId  String?
+  signature    Signature?    @relation(fields: [signatureId], references: [id], onDelete: SetNull)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 

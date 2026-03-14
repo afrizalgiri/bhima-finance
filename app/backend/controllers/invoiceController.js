@@ -34,7 +34,7 @@ const getOne = async (req, res) => {
   try {
     const invoice = await prisma.invoice.findUnique({
       where: { id: req.params.id },
-      include: { client: true, items: { include: { product: true } }, payments: true },
+      include: { client: true, items: { include: { product: true } }, payments: true, signature: true },
     });
     if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
     res.json({ success: true, data: invoice });
@@ -45,7 +45,7 @@ const getOne = async (req, res) => {
 
 const create = async (req, res) => {
   try {
-    const { clientId, date, dueDate, items, taxRate = 0, notes, openingText, closingText, headerColor } = req.body;
+    const { clientId, date, dueDate, items, taxRate = 0, notes, openingText, closingText, headerColor, signatureId } = req.body;
 
     if (!clientId || !items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Client and items required' });
@@ -63,6 +63,7 @@ const create = async (req, res) => {
         clientId, subtotal, taxRate, taxAmount, total, notes,
         openingText: openingText || null, closingText: closingText || null,
         headerColor: headerColor || null,
+        signatureId: signatureId || null,
         items: {
           create: items.map(item => ({
             productId: item.productId || null, name: item.name,
@@ -71,7 +72,7 @@ const create = async (req, res) => {
           })),
         },
       },
-      include: { client: true, items: true },
+      include: { client: true, items: true, signature: true },
     });
 
     await logActivity(req.user.id, 'Membuat Invoice', 'Invoice', invoice.id, `${invoice.number} untuk ${invoice.client.name}`);
@@ -84,7 +85,7 @@ const create = async (req, res) => {
 
 const update = async (req, res) => {
   try {
-    const { clientId, date, dueDate, items, taxRate = 0, notes, status, openingText, closingText, headerColor } = req.body;
+    const { clientId, date, dueDate, items, taxRate = 0, notes, status, openingText, closingText, headerColor, signatureId } = req.body;
 
     let updateData = {
       status, notes,
@@ -93,6 +94,7 @@ const update = async (req, res) => {
       openingText: openingText ?? undefined,
       closingText: closingText ?? undefined,
       headerColor: headerColor ?? undefined,
+      signatureId: signatureId !== undefined ? (signatureId || null) : undefined,
     };
 
     if (items && items.length > 0) {
@@ -114,7 +116,7 @@ const update = async (req, res) => {
     const invoice = await prisma.invoice.update({
       where: { id: req.params.id },
       data: updateData,
-      include: { client: true, items: true },
+      include: { client: true, items: true, signature: true },
     });
 
     await logActivity(req.user.id, 'Mengupdate Invoice', 'Invoice', invoice.id, `${invoice.number}`);
@@ -140,7 +142,7 @@ const generatePdf = async (req, res) => {
   try {
     const invoice = await prisma.invoice.findUnique({
       where: { id: req.params.id },
-      include: { client: true, items: { include: { product: true } }, payments: true },
+      include: { client: true, items: { include: { product: true } }, payments: true, signature: true },
     });
     if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
 

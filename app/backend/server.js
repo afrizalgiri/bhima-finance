@@ -17,6 +17,7 @@ const userRoutes = require('./routes/users');
 const aiRoutes = require('./routes/ai');
 const activityRoutes = require('./routes/activity');
 const payrollRoutes = require('./routes/payroll');
+const signatureRoutes = require('./routes/signatures');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -49,6 +50,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/payroll', payrollRoutes);
+app.use('/api/signatures', signatureRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

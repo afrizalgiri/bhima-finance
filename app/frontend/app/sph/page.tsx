@@ -15,10 +15,13 @@ interface Item { name: string; description: string; quantity: number; unit: stri
 const emptyItem: Item = { name: '', description: '', quantity: 1, unit: 'pcs', price: 0 };
 const units = ['pcs', 'unit', 'set', 'bulan', 'hari', 'jam', 'kg', 'liter', 'meter', 'paket'];
 
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
+
 export default function SphPage() {
   const [sphs, setSphs] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [signatures, setSignatures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialog, setViewDialog] = useState(false);
@@ -26,6 +29,7 @@ export default function SphPage() {
   const [form, setForm] = useState({
     clientId: '', date: new Date().toISOString().split('T')[0], validUntil: '',
     taxRate: '0', notes: '', openingText: '', closingText: '', headerColor: '#1a3557', signerTitle: '',
+    signatureId: '',
   });
   const [items, setItems] = useState<Item[]>([{ ...emptyItem }]);
   const [saving, setSaving] = useState(false);
@@ -35,8 +39,8 @@ export default function SphPage() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [sr, cr, pr] = await Promise.all([api.get('/sph'), api.get('/clients'), api.get('/products')]);
-      setSphs(sr.data.data); setClients(cr.data.data); setProducts(pr.data.data);
+      const [sr, cr, pr, sigr] = await Promise.all([api.get('/sph'), api.get('/clients'), api.get('/products'), api.get('/signatures')]);
+      setSphs(sr.data.data); setClients(cr.data.data); setProducts(pr.data.data); setSignatures(sigr.data.data);
     } finally { setLoading(false); }
   };
 
@@ -93,6 +97,7 @@ export default function SphPage() {
         closingText: form.closingText || null,
         headerColor: form.headerColor || null,
         signerTitle: form.signerTitle || null,
+        signatureId: form.signatureId || null,
       });
       toast({ title: 'SPH berhasil dibuat' });
       setDialogOpen(false); fetchAll();
@@ -125,7 +130,7 @@ export default function SphPage() {
 
   const openCreate = () => {
     setItems([{ ...emptyItem }]);
-    setForm({ clientId: '', date: new Date().toISOString().split('T')[0], validUntil: '', taxRate: '0', notes: '', openingText: '', closingText: '', headerColor: '#1a3557', signerTitle: '' });
+    setForm({ clientId: '', date: new Date().toISOString().split('T')[0], validUntil: '', taxRate: '0', notes: '', openingText: '', closingText: '', headerColor: '#1a3557', signerTitle: '', signatureId: '' });
     setDialogOpen(true);
   };
 
@@ -265,6 +270,25 @@ export default function SphPage() {
                   placeholder="contoh: Finance Department / Direktur / Manager"
                   className="mt-1 text-sm" />
               </div>
+              <div>
+                <Label className="text-xs">Tanda Tangan Digital</Label>
+                <select value={form.signatureId} onChange={e => setForm({...form, signatureId: e.target.value})}
+                  className="mt-1 w-full rounded-md border border-input px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                  <option value="">-- Tanpa TTD --</option>
+                  {signatures.map((s: any) => (
+                    <option key={s.id} value={s.id}>{s.name}{s.title ? ` (${s.title})` : ''}</option>
+                  ))}
+                </select>
+                {form.signatureId && (() => {
+                  const sig = signatures.find((s: any) => s.id === form.signatureId);
+                  return sig ? (
+                    <div className="mt-2 flex items-center gap-2 p-2 bg-gray-50 rounded border border-gray-100">
+                      <img src={`${API_BASE}${sig.imageUrl}`} alt={sig.name} className="h-10 object-contain" />
+                      <span className="text-xs text-gray-600">{sig.name}</span>
+                    </div>
+                  ) : null;
+                })()}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -332,6 +356,16 @@ export default function SphPage() {
               {selected.closingText && (
                 <div className="p-2 bg-gray-50 rounded text-xs text-gray-600 italic">
                   <span className="font-semibold not-italic text-gray-700">Penutup: </span>{selected.closingText}
+                </div>
+              )}
+              {selected.signature && (
+                <div className="flex justify-end pt-2">
+                  <div className="text-center">
+                    <div className="text-xs text-gray-500 mb-1">Hormat kami,</div>
+                    <img src={`${API_BASE}${selected.signature.imageUrl}`} alt={selected.signature.name} className="h-14 object-contain mx-auto" />
+                    <div className="border-t border-gray-400 mt-1 pt-1 text-xs font-semibold">{selected.signature.name}</div>
+                    {selected.signature.title && <div className="text-xs text-gray-500">{selected.signature.title}</div>}
+                  </div>
                 </div>
               )}
             </div>
