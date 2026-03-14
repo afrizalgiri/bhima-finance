@@ -47,6 +47,7 @@ const generateSphPdf = (sph, company, docName = 'Surat Penawaran Harga') => new 
   const logo = getLogoBuffer(company);
   const NAVY = '#1a3557';
   const GOLD = '#c9a84c';
+  const HEADER_COLOR = sph.headerColor || NAVY;
 
   // ── KOP SURAT ─────────────────────────────────────
   // Garis atas kop (dua garis tebal-tipis)
@@ -119,9 +120,10 @@ const generateSphPdf = (sph, company, docName = 'Surat Penawaran Harga') => new 
   doc.fontSize(9).font('Helvetica').fillColor('#333')
     .text('Dengan hormat,', col1, y);
   y = doc.y + 4;
+  const openingText = sph.openingText ||
+    `Bersama surat ini kami dari ${company?.name || 'perusahaan kami'} bermaksud menyampaikan penawaran harga untuk kebutuhan Bapak/Ibu sebagai berikut:`;
   doc.fontSize(9).font('Helvetica').fillColor('#333')
-    .text(`Bersama surat ini kami dari ${company?.name || 'perusahaan kami'} bermaksud menyampaikan penawaran harga untuk kebutuhan Bapak/Ibu sebagai berikut:`,
-      col1, y, { width: CW, align: 'justify', lineGap: 2 });
+    .text(openingText, col1, y, { width: CW, align: 'justify', lineGap: 2 });
   y = doc.y + 14;
 
   // ── TABEL ITEM ────────────────────────────────────
@@ -130,7 +132,7 @@ const generateSphPdf = (sph, company, docName = 'Surat Penawaran Harga') => new 
   const rh = 18;
 
   // Header tabel
-  doc.rect(M, y, CW, rh).fillColor(NAVY).fill();
+  doc.rect(M, y, CW, rh).fillColor(HEADER_COLOR).fill();
   [['No', 'no', 'center'], ['Uraian / Deskripsi', 'nama', 'left'], ['Qty', 'qty', 'center'],
     ['Sat.', 'sat', 'center'], ['Harga Satuan (Rp)', 'harga', 'right'], ['Jumlah (Rp)', 'total', 'right']
   ].forEach(([h, k, align]) => {
@@ -168,8 +170,8 @@ const generateSphPdf = (sph, company, docName = 'Surat Penawaran Harga') => new 
 
   totals.forEach(([label, val], i) => {
     const isLast = i === totals.length - 1;
-    if (isLast) doc.rect(M + CW - 250, y, 250, rh).fillColor(NAVY).fill();
-    else doc.rect(M + CW - 250, y, 250, rh).fillColor(isLast ? NAVY : '#eef2f7').fill();
+    if (isLast) doc.rect(M + CW - 250, y, 250, rh).fillColor(HEADER_COLOR).fill();
+    else doc.rect(M + CW - 250, y, 250, rh).fillColor(isLast ? HEADER_COLOR : '#eef2f7').fill();
     doc.rect(M, y, CW - 250, rh).strokeColor('#dde3ea').lineWidth(0.5).stroke();
     doc.rect(M + CW - 250, y, 250, rh).strokeColor('#dde3ea').lineWidth(0.5).stroke();
     doc.fontSize(isLast ? 9 : 8).font(isLast ? 'Helvetica-Bold' : 'Helvetica')
@@ -200,9 +202,10 @@ const generateSphPdf = (sph, company, docName = 'Surat Penawaran Harga') => new 
   }
 
   // ── PENUTUP ────────────────────────────────────────
+  const closingText = sph.closingText ||
+    'Demikian penawaran harga ini kami sampaikan. Atas perhatian dan kepercayaan Bapak/Ibu, kami ucapkan terima kasih.';
   doc.fontSize(9).font('Helvetica').fillColor('#333')
-    .text('Demikian penawaran harga ini kami sampaikan. Atas perhatian dan kepercayaan Bapak/Ibu, kami ucapkan terima kasih.',
-      M, y, { width: CW, align: 'justify', lineGap: 2 });
+    .text(closingText, M, y, { width: CW, align: 'justify', lineGap: 2 });
   y = doc.y + 18;
 
   // ── TANDA TANGAN ──────────────────────────────────
@@ -235,6 +238,7 @@ const generateInvoicePdf = (invoice, company, docName = 'INVOICE') => new Promis
   const TEAL = '#0f766e';
   const TEAL_DARK = '#134e4a';
   const TEAL_LIGHT = '#f0fdfa';
+  const INV_HEADER_COLOR = invoice.headerColor || TEAL;
 
   const statusLabel = { UNPAID: 'BELUM DIBAYAR', PARTIAL: 'DIBAYAR SEBAGIAN', PAID: 'LUNAS', OVERDUE: 'JATUH TEMPO' };
   const statusColor = { UNPAID: '#dc2626', PARTIAL: '#d97706', PAID: '#16a34a', OVERDUE: '#dc2626' };
@@ -302,7 +306,7 @@ const generateInvoicePdf = (invoice, company, docName = 'INVOICE') => new Promis
   const cw = { no: 22, desc: 243, qty: 55, sat: 50, price: 80, total: CW - 450 };
   const rh = 20;
 
-  doc.rect(M, y, CW, rh).fillColor(TEAL).fill();
+  doc.rect(M, y, CW, rh).fillColor(INV_HEADER_COLOR).fill();
   [['No', 'no', 'center'], ['Deskripsi', 'desc', 'left'], ['Qty', 'qty', 'center'],
     ['Sat.', 'sat', 'center'], ['Harga Satuan', 'price', 'right'], ['Jumlah', 'total', 'right']
   ].forEach(([h, k, align]) => {
@@ -344,7 +348,7 @@ const generateInvoicePdf = (invoice, company, docName = 'INVOICE') => new Promis
   totRows.forEach(([label, val, bold, color]) => {
     const bx = M + CW - 230;
     if (bold) {
-      doc.rect(bx, y, 230, 20).fillColor(color || TEAL).fill();
+      doc.rect(bx, y, 230, 20).fillColor(color || INV_HEADER_COLOR).fill();
       doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#fff')
         .text(label, bx + 8, y + 6, { width: 130 })
         .text(`Rp ${Number(val).toLocaleString('id-ID')}`, bx + 138, y + 6, { width: 84, align: 'right' });

@@ -44,7 +44,7 @@ const getOne = async (req, res) => {
 
 const create = async (req, res) => {
   try {
-    const { clientId, date, dueDate, items, taxRate = 0, notes } = req.body;
+    const { clientId, date, dueDate, items, taxRate = 0, notes, openingText, closingText, headerColor } = req.body;
 
     if (!clientId || !items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Client and items required' });
@@ -67,6 +67,9 @@ const create = async (req, res) => {
         taxAmount,
         total,
         notes,
+        openingText: openingText || null,
+        closingText: closingText || null,
+        headerColor: headerColor || null,
         items: {
           create: items.map(item => ({
             productId: item.productId || null,
@@ -91,13 +94,16 @@ const create = async (req, res) => {
 
 const update = async (req, res) => {
   try {
-    const { clientId, date, dueDate, items, taxRate = 0, notes, status } = req.body;
+    const { clientId, date, dueDate, items, taxRate = 0, notes, status, openingText, closingText, headerColor } = req.body;
 
     let updateData = {
       status,
       notes,
       date: date ? new Date(date) : undefined,
       dueDate: dueDate ? new Date(dueDate) : undefined,
+      openingText: openingText ?? undefined,
+      closingText: closingText ?? undefined,
+      headerColor: headerColor ?? undefined,
     };
 
     if (items && items.length > 0) {

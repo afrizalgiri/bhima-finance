@@ -9,7 +9,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { toast } from '../../components/ui/toaster';
 import { formatCurrency, formatDate, SPH_STATUS } from '../../lib/utils';
-import { Plus, Download, Eye, Trash2, X } from 'lucide-react';
+import { Plus, Download, Eye, Trash2, X, Sparkles, Loader2 } from 'lucide-react';
 
 interface Item { name: string; description: string; quantity: number; unit: string; price: number; productId?: string; }
 const emptyItem: Item = { name: '', description: '', quantity: 1, unit: 'pcs', price: 0 };
@@ -23,10 +23,14 @@ export default function SphPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialog, setViewDialog] = useState(false);
   const [selected, setSelected] = useState<any>(null);
-  const [form, setForm] = useState({ clientId: '', date: new Date().toISOString().split('T')[0], validUntil: '', taxRate: '0', notes: '' });
+  const [form, setForm] = useState({
+    clientId: '', date: new Date().toISOString().split('T')[0], validUntil: '',
+    taxRate: '0', notes: '', openingText: '', closingText: '', headerColor: '#1a3557',
+  });
   const [items, setItems] = useState<Item[]>([{ ...emptyItem }]);
   const [saving, setSaving] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [generatingAi, setGeneratingAi] = useState(false);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -58,10 +62,36 @@ export default function SphPage() {
   const taxAmount = subtotal * (parseFloat(form.taxRate) / 100);
   const total = subtotal + taxAmount;
 
+  const generateAiText = async () => {
+    const validItems = items.filter(i => i.name.trim());
+    if (validItems.length === 0) {
+      toast({ title: 'Isi minimal satu item terlebih dahulu', variant: 'destructive' });
+      return;
+    }
+    setGeneratingAi(true);
+    try {
+      const client = clients.find((c: any) => c.id === form.clientId);
+      const r = await api.post('/ai/generate-text', {
+        items: validItems.map(i => ({ name: i.name, description: i.description, unit: i.unit })),
+        docType: 'sph',
+        clientName: client?.name || '',
+      });
+      setForm(f => ({ ...f, openingText: r.data.data.openingText, closingText: r.data.data.closingText }));
+      toast({ title: 'Teks berhasil digenerate oleh AI' });
+    } catch {
+      toast({ title: 'Gagal generate teks AI', variant: 'destructive' });
+    } finally { setGeneratingAi(false); }
+  };
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true);
     try {
-      await api.post('/sph', { ...form, taxRate: parseFloat(form.taxRate), items });
+      await api.post('/sph', {
+        ...form, taxRate: parseFloat(form.taxRate), items,
+        openingText: form.openingText || null,
+        closingText: form.closingText || null,
+        headerColor: form.headerColor || null,
+      });
       toast({ title: 'SPH berhasil dibuat' });
       setDialogOpen(false); fetchAll();
     } catch (err: any) {
@@ -93,7 +123,7 @@ export default function SphPage() {
 
   const openCreate = () => {
     setItems([{ ...emptyItem }]);
-    setForm({ clientId: '', date: new Date().toISOString().split('T')[0], validUntil: '', taxRate: '0', notes: '' });
+    setForm({ clientId: '', date: new Date().toISOString().split('T')[0], validUntil: '', taxRate: '0', notes: '', openingText: '', closingText: '', headerColor: '#1a3557' });
     setDialogOpen(true);
   };
 
@@ -196,6 +226,39 @@ export default function SphPage() {
               </div>
             </div>
 
+            {/* AI Text & Color */}
+            <div className="border border-purple-200 rounded-lg p-3 bg-purple-50 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-purple-800 font-semibold">Teks Pembuka & Penutup</Label>
+                <Button type="button" variant="outline" size="sm"
+                  onClick={generateAiText} disabled={generatingAi}
+                  className="border-purple-400 text-purple-700 hover:bg-purple-100">
+                  {generatingAi ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  {generatingAi ? 'Generating...' : 'Generate AI'}
+                </Button>
+              </div>
+              <div>
+                <Label className="text-xs">Paragraf Pembuka</Label>
+                <textarea value={form.openingText} onChange={e => setForm({...form, openingText: e.target.value})} rows={2}
+                  placeholder="Otomatis digenerate oleh AI, atau ketik manual..."
+                  className="mt-1 w-full rounded-md border border-input px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+              </div>
+              <div>
+                <Label className="text-xs">Paragraf Penutup</Label>
+                <textarea value={form.closingText} onChange={e => setForm({...form, closingText: e.target.value})} rows={2}
+                  placeholder="Otomatis digenerate oleh AI, atau ketik manual..."
+                  className="mt-1 w-full rounded-md border border-input px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Label className="text-xs text-purple-800">Warna Header Tabel:</Label>
+                <input type="color" value={form.headerColor} onChange={e => setForm({...form, headerColor: e.target.value})}
+                  className="h-8 w-12 rounded cursor-pointer border border-gray-300" />
+                <span className="text-xs text-gray-500">{form.headerColor}</span>
+                <button type="button" onClick={() => setForm({...form, headerColor: '#1a3557'})}
+                  className="text-xs text-purple-600 hover:underline">Reset</button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div><Label>PPN (%)</Label><Input type="number" min="0" max="100" value={form.taxRate} onChange={e => setForm({...form, taxRate: e.target.value})} className="mt-1" /></div>
               <div className="flex flex-col justify-end text-right">
@@ -228,13 +291,18 @@ export default function SphPage() {
                 <div><span className="text-gray-500">Klien:</span> <strong>{selected.client?.name}</strong></div>
                 <div><span className="text-gray-500">Tanggal:</span> {formatDate(selected.date)}</div>
               </div>
+              {selected.openingText && (
+                <div className="p-2 bg-gray-50 rounded text-xs text-gray-600 italic">
+                  <span className="font-semibold not-italic text-gray-700">Pembuka: </span>{selected.openingText}
+                </div>
+              )}
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="bg-gray-100">
-                    <th className="text-left p-2 text-xs">Nama</th>
-                    <th className="text-center p-2 text-xs">Qty</th>
-                    <th className="text-right p-2 text-xs">Harga</th>
-                    <th className="text-right p-2 text-xs">Total</th>
+                  <tr style={{ backgroundColor: selected.headerColor || '#1a3557' }}>
+                    <th className="text-left p-2 text-xs text-white">Nama</th>
+                    <th className="text-center p-2 text-xs text-white">Qty</th>
+                    <th className="text-right p-2 text-xs text-white">Harga</th>
+                    <th className="text-right p-2 text-xs text-white">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -253,6 +321,11 @@ export default function SphPage() {
                 {Number(selected.taxRate) > 0 && <div className="text-gray-500">PPN {Number(selected.taxRate)}%: {formatCurrency(selected.taxAmount)}</div>}
                 <div className="text-lg font-bold text-blue-700">Total: {formatCurrency(selected.total)}</div>
               </div>
+              {selected.closingText && (
+                <div className="p-2 bg-gray-50 rounded text-xs text-gray-600 italic">
+                  <span className="font-semibold not-italic text-gray-700">Penutup: </span>{selected.closingText}
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>

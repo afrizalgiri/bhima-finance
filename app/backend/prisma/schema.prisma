@@ -76,21 +76,24 @@ model Product {
 }
 
 model Sph {
-  id          String    @id @default(uuid())
-  number      String    @unique
-  date        DateTime
-  validUntil  DateTime?
-  clientId    String
-  client      Client    @relation(fields: [clientId], references: [id])
-  items       SphItem[]
-  subtotal    Float     @default(0)
-  taxRate     Float     @default(0)
-  taxAmount   Float     @default(0)
-  total       Float     @default(0)
-  notes       String?
-  status      String    @default("DRAFT")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id           String    @id @default(uuid())
+  number       String    @unique
+  date         DateTime
+  validUntil   DateTime?
+  clientId     String
+  client       Client    @relation(fields: [clientId], references: [id])
+  items        SphItem[]
+  subtotal     Float     @default(0)
+  taxRate      Float     @default(0)
+  taxAmount    Float     @default(0)
+  total        Float     @default(0)
+  notes        String?
+  status       String    @default("DRAFT")
+  openingText  String?
+  closingText  String?
+  headerColor  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@map("sphs")
 }
@@ -114,23 +117,26 @@ model SphItem {
 }
 
 model Invoice {
-  id          String        @id @default(uuid())
-  number      String        @unique
-  date        DateTime
-  dueDate     DateTime
-  clientId    String
-  client      Client        @relation(fields: [clientId], references: [id])
-  items       InvoiceItem[]
-  subtotal    Float         @default(0)
-  taxRate     Float         @default(0)
-  taxAmount   Float         @default(0)
-  total       Float         @default(0)
-  paidAmount  Float         @default(0)
-  notes       String?
-  status      String        @default("UNPAID")
-  payments    Payment[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id           String        @id @default(uuid())
+  number       String        @unique
+  date         DateTime
+  dueDate      DateTime
+  clientId     String
+  client       Client        @relation(fields: [clientId], references: [id])
+  items        InvoiceItem[]
+  subtotal     Float         @default(0)
+  taxRate      Float         @default(0)
+  taxAmount    Float         @default(0)
+  total        Float         @default(0)
+  paidAmount   Float         @default(0)
+  notes        String?
+  status       String        @default("UNPAID")
+  payments     Payment[]
+  openingText  String?
+  closingText  String?
+  headerColor  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   @@map("invoices")
 }
