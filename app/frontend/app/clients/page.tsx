@@ -11,6 +11,7 @@ import { Plus, Edit, Trash2, Search } from 'lucide-react';
 
 interface Client {
   id: string;
+  type: string;
   name: string;
   address: string;
   email?: string;
@@ -18,7 +19,7 @@ interface Client {
   pic?: string;
 }
 
-const empty: Omit<Client, 'id'> = { name: '', address: '', email: '', phone: '', pic: '' };
+const empty: Omit<Client, 'id'> = { type: 'COMPANY', name: '', address: '', email: '', phone: '', pic: '' };
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -40,7 +41,7 @@ export default function ClientsPage() {
   useEffect(() => { fetchClients(); }, [search]);
 
   const openAdd = () => { setEditing(null); setForm(empty); setDialogOpen(true); };
-  const openEdit = (c: Client) => { setEditing(c); setForm({ name: c.name, address: c.address, email: c.email || '', phone: c.phone || '', pic: c.pic || '' }); setDialogOpen(true); };
+  const openEdit = (c: Client) => { setEditing(c); setForm({ type: c.type || 'COMPANY', name: c.name, address: c.address, email: c.email || '', phone: c.phone || '', pic: c.pic || '' }); setDialogOpen(true); };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,7 +92,7 @@ export default function ClientsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-3 font-semibold text-gray-600">Nama Perusahaan</th>
+                  <th className="text-left py-2 px-3 font-semibold text-gray-600">Nama</th>
                   <th className="text-left py-2 px-3 font-semibold text-gray-600">Alamat</th>
                   <th className="text-left py-2 px-3 font-semibold text-gray-600">Email</th>
                   <th className="text-left py-2 px-3 font-semibold text-gray-600">Telepon</th>
@@ -106,7 +107,14 @@ export default function ClientsPage() {
                   <tr><td colSpan={6} className="text-center py-8 text-gray-400">Belum ada klien</td></tr>
                 ) : clients.map(c => (
                   <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-2.5 px-3 font-medium">{c.name}</td>
+                    <td className="py-2.5 px-3 font-medium">
+                      <div className="flex items-center gap-2">
+                        <span>{c.name}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${c.type === 'INDIVIDUAL' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {c.type === 'INDIVIDUAL' ? 'Retail' : 'Perusahaan'}
+                        </span>
+                      </div>
+                    </td>
                     <td className="py-2.5 px-3 text-gray-600 max-w-[200px] truncate">{c.address}</td>
                     <td className="py-2.5 px-3 text-gray-600">{c.email || '-'}</td>
                     <td className="py-2.5 px-3 text-gray-600">{c.phone || '-'}</td>
@@ -129,7 +137,20 @@ export default function ClientsPage() {
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>{editing ? 'Edit Klien' : 'Tambah Klien'}</DialogTitle></DialogHeader>
           <form onSubmit={save} className="space-y-3">
-            <div><Label>Nama Perusahaan *</Label><Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} required className="mt-1" /></div>
+            <div>
+              <Label>Tipe Klien</Label>
+              <div className="flex gap-2 mt-1">
+                <button type="button" onClick={() => setForm({...form, type: 'COMPANY'})}
+                  className={`flex-1 py-1.5 rounded-md border text-sm font-medium transition-colors ${form.type === 'COMPANY' ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                  Perusahaan
+                </button>
+                <button type="button" onClick={() => setForm({...form, type: 'INDIVIDUAL'})}
+                  className={`flex-1 py-1.5 rounded-md border text-sm font-medium transition-colors ${form.type === 'INDIVIDUAL' ? 'bg-orange-500 text-white border-orange-500' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                  Retail / Perorangan
+                </button>
+              </div>
+            </div>
+            <div><Label>{form.type === 'INDIVIDUAL' ? 'Nama *' : 'Nama Perusahaan *'}</Label><Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} required className="mt-1" placeholder={form.type === 'INDIVIDUAL' ? 'Contoh: Budi Santoso' : 'Contoh: PT. Maju Bersama'} /></div>
             <div><Label>Alamat *</Label><textarea value={form.address} onChange={e => setForm({...form, address: e.target.value})} required rows={2} className="mt-1 w-full rounded-md border border-input px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" /></div>
             <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="mt-1" /></div>
             <div><Label>Telepon</Label><Input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="mt-1" /></div>

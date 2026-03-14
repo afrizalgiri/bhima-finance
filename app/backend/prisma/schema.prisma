@@ -47,6 +47,7 @@ model CompanySetting {
 
 model Client {
   id        String    @id @default(uuid())
+  type      String    @default("COMPANY")
   name      String
   address   String
   email     String?
