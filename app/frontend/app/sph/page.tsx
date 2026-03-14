@@ -25,7 +25,7 @@ export default function SphPage() {
   const [selected, setSelected] = useState<any>(null);
   const [form, setForm] = useState({
     clientId: '', date: new Date().toISOString().split('T')[0], validUntil: '',
-    taxRate: '0', notes: '', openingText: '', closingText: '', headerColor: '#1a3557',
+    taxRate: '0', notes: '', openingText: '', closingText: '', headerColor: '#1a3557', signerTitle: '',
   });
   const [items, setItems] = useState<Item[]>([{ ...emptyItem }]);
   const [saving, setSaving] = useState(false);
@@ -91,6 +91,7 @@ export default function SphPage() {
         openingText: form.openingText || null,
         closingText: form.closingText || null,
         headerColor: form.headerColor || null,
+        signerTitle: form.signerTitle || null,
       });
       toast({ title: 'SPH berhasil dibuat' });
       setDialogOpen(false); fetchAll();
@@ -123,7 +124,7 @@ export default function SphPage() {
 
   const openCreate = () => {
     setItems([{ ...emptyItem }]);
-    setForm({ clientId: '', date: new Date().toISOString().split('T')[0], validUntil: '', taxRate: '0', notes: '', openingText: '', closingText: '', headerColor: '#1a3557' });
+    setForm({ clientId: '', date: new Date().toISOString().split('T')[0], validUntil: '', taxRate: '0', notes: '', openingText: '', closingText: '', headerColor: '#1a3557', signerTitle: '' });
     setDialogOpen(true);
   };
 
@@ -256,6 +257,12 @@ export default function SphPage() {
                 <span className="text-xs text-gray-500">{form.headerColor}</span>
                 <button type="button" onClick={() => setForm({...form, headerColor: '#1a3557'})}
                   className="text-xs text-purple-600 hover:underline">Reset</button>
+              </div>
+              <div>
+                <Label className="text-xs">Jabatan Penanda Tangan</Label>
+                <Input value={form.signerTitle} onChange={e => setForm({...form, signerTitle: e.target.value})}
+                  placeholder="contoh: Finance Department / Direktur / Manager"
+                  className="mt-1 text-sm" />
               </div>
             </div>
 

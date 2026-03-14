@@ -93,6 +93,7 @@ model Sph {
   openingText  String?
   closingText  String?
   headerColor  String?
+  signerTitle  String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

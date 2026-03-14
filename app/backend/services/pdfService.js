@@ -219,7 +219,7 @@ const generateSphPdf = (sph, company, docName = 'Surat Penawaran Harga') => new 
   doc.moveTo(sigX, y).lineTo(sigX + 140, y).lineWidth(0.8).strokeColor('#333').stroke();
   y += 4;
   doc.fontSize(8).font('Helvetica').fillColor('#555')
-    .text('Finance Department', sigX, y, { width: 140, align: 'center' });
+    .text(sph.signerTitle || 'Finance Department', sigX, y, { width: 140, align: 'center' });
 
   // Garis bawah halaman
   doc.rect(M, PAGE_H - M - 8, CW, 1.5).fillColor(GOLD).fill();

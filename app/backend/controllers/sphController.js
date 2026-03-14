@@ -45,7 +45,7 @@ const getOne = async (req, res) => {
 
 const create = async (req, res) => {
   try {
-    const { clientId, date, validUntil, items, taxRate = 0, notes, openingText, closingText, headerColor } = req.body;
+    const { clientId, date, validUntil, items, taxRate = 0, notes, openingText, closingText, headerColor, signerTitle } = req.body;
 
     if (!clientId || !items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Client and items required' });
@@ -71,6 +71,7 @@ const create = async (req, res) => {
         openingText: openingText || null,
         closingText: closingText || null,
         headerColor: headerColor || null,
+        signerTitle: signerTitle || null,
         items: {
           create: items.map(item => ({
             productId: item.productId || null,
@@ -95,9 +96,9 @@ const create = async (req, res) => {
 
 const update = async (req, res) => {
   try {
-    const { clientId, date, validUntil, items, taxRate = 0, notes, status, openingText, closingText, headerColor } = req.body;
+    const { clientId, date, validUntil, items, taxRate = 0, notes, status, openingText, closingText, headerColor, signerTitle } = req.body;
 
-    let updateData = { status, notes, date: date ? new Date(date) : undefined, validUntil: validUntil ? new Date(validUntil) : null, openingText: openingText ?? undefined, closingText: closingText ?? undefined, headerColor: headerColor ?? undefined };
+    let updateData = { status, notes, date: date ? new Date(date) : undefined, validUntil: validUntil ? new Date(validUntil) : null, openingText: openingText ?? undefined, closingText: closingText ?? undefined, headerColor: headerColor ?? undefined, signerTitle: signerTitle ?? undefined };
 
     if (items && items.length > 0) {
       const subtotal = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
