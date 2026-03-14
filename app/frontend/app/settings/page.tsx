@@ -7,6 +7,7 @@ import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { toast } from '../../components/ui/toaster';
 import { Upload } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function SettingsPage() {
   const [form, setForm] = useState({
@@ -19,6 +20,9 @@ export default function SettingsPage() {
   const [logoUrl, setLogoUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [pwLoading, setPwLoading] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     api.get('/company').then(r => {
@@ -58,6 +62,25 @@ export default function SettingsPage() {
       toast({ title: 'Logo berhasil diupload' });
     } catch { toast({ title: 'Gagal upload logo', variant: 'destructive' }); }
     finally { setUploading(false); }
+  };
+
+  const changePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      toast({ title: 'Password baru tidak cocok', variant: 'destructive' }); return;
+    }
+    if (pwForm.newPassword.length < 6) {
+      toast({ title: 'Password minimal 6 karakter', variant: 'destructive' }); return;
+    }
+    setPwLoading(true);
+    try {
+      await api.put('/auth/change-password', { currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword });
+      toast({ title: 'Password berhasil diubah', description: 'Silakan login ulang' });
+      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setTimeout(() => { localStorage.removeItem('token'); router.push('/login'); }, 1500);
+    } catch (err: any) {
+      toast({ title: err.response?.data?.message || 'Gagal mengubah password', variant: 'destructive' });
+    } finally { setPwLoading(false); }
   };
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -165,6 +188,18 @@ export default function SettingsPage() {
         </Card>
 
         <div className="mt-4"><Button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700">{saving ? 'Menyimpan...' : 'Simpan Pengaturan'}</Button></div>
+      </form>
+
+      <form onSubmit={changePassword}>
+        <Card className="mt-4">
+          <CardHeader><CardTitle className="text-base">Ganti Password</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div><Label>Password Saat Ini</Label><Input type="password" value={pwForm.currentPassword} onChange={e => setPwForm({...pwForm, currentPassword: e.target.value})} required className="mt-1" /></div>
+            <div><Label>Password Baru</Label><Input type="password" value={pwForm.newPassword} onChange={e => setPwForm({...pwForm, newPassword: e.target.value})} required className="mt-1" /></div>
+            <div><Label>Konfirmasi Password Baru</Label><Input type="password" value={pwForm.confirmPassword} onChange={e => setPwForm({...pwForm, confirmPassword: e.target.value})} required className="mt-1" /></div>
+            <Button type="submit" disabled={pwLoading} className="bg-red-600 hover:bg-red-700">{pwLoading ? 'Menyimpan...' : 'Ganti Password'}</Button>
+          </CardContent>
+        </Card>
       </form>
     </div>
   );
