@@ -7,6 +7,8 @@ interface User {
   name: string;
   email: string;
   role: string;
+  canViewHistory?: boolean;
+  canViewSalary?: boolean;
 }
 
 interface AuthContextType {

@@ -7,7 +7,8 @@ router.use(authenticate);
 
 router.get('/', requireAdmin, ctrl.listUsers);
 router.post('/', requireAdmin, ctrl.createUser);
-router.put('/:id', ctrl.updateUser);              // admin edit siapa saja, staff hanya dirinya
+router.put('/:id', ctrl.updateUser);
+router.put('/:id/permissions', requireAdmin, ctrl.updatePermissions);
 router.put('/:id/reset-password', requireAdmin, ctrl.resetPassword);
 router.delete('/:id', requireAdmin, ctrl.deleteUser);
 

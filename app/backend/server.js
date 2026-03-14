@@ -15,6 +15,8 @@ const companyRoutes = require('./routes/company');
 const dashboardRoutes = require('./routes/dashboard');
 const userRoutes = require('./routes/users');
 const aiRoutes = require('./routes/ai');
+const activityRoutes = require('./routes/activity');
+const payrollRoutes = require('./routes/payroll');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -45,6 +47,8 @@ app.use('/api/company', companyRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/activity', activityRoutes);
+app.use('/api/payroll', payrollRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

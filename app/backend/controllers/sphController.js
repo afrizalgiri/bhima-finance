@@ -1,5 +1,6 @@
 const { generateSphNumber } = require('../utils/numberGenerator');
 const { generateSphPdf } = require('../services/pdfService');
+const { logActivity } = require('../utils/activityLog');
 const prisma = require('../lib/prisma');
 
 const getAll = async (req, res) => {
@@ -59,34 +60,22 @@ const create = async (req, res) => {
 
     const sph = await prisma.sph.create({
       data: {
-        number,
-        date: new Date(date),
-        validUntil: validUntil ? new Date(validUntil) : null,
-        clientId,
-        subtotal,
-        taxRate,
-        taxAmount,
-        total,
-        notes,
-        openingText: openingText || null,
-        closingText: closingText || null,
-        headerColor: headerColor || null,
-        signerTitle: signerTitle || null,
+        number, date: new Date(date), validUntil: validUntil ? new Date(validUntil) : null,
+        clientId, subtotal, taxRate, taxAmount, total, notes,
+        openingText: openingText || null, closingText: closingText || null,
+        headerColor: headerColor || null, signerTitle: signerTitle || null,
         items: {
           create: items.map(item => ({
-            productId: item.productId || null,
-            name: item.name,
-            description: item.description || null,
-            quantity: item.quantity,
-            unit: item.unit || 'pcs',
-            price: item.price,
-            total: item.quantity * item.price,
+            productId: item.productId || null, name: item.name,
+            description: item.description || null, quantity: item.quantity,
+            unit: item.unit || 'pcs', price: item.price, total: item.quantity * item.price,
           })),
         },
       },
       include: { client: true, items: true },
     });
 
+    await logActivity(req.user.id, 'Membuat SPH', 'SPH', sph.id, `${sph.number} untuk ${sph.client.name}`);
     res.status(201).json({ success: true, data: sph });
   } catch (error) {
     console.error(error);
@@ -109,14 +98,9 @@ const update = async (req, res) => {
       await prisma.sphItem.deleteMany({ where: { sphId: req.params.id } });
       await prisma.sphItem.createMany({
         data: items.map(item => ({
-          sphId: req.params.id,
-          productId: item.productId || null,
-          name: item.name,
-          description: item.description || null,
-          quantity: item.quantity,
-          unit: item.unit || 'pcs',
-          price: item.price,
-          total: item.quantity * item.price,
+          sphId: req.params.id, productId: item.productId || null, name: item.name,
+          description: item.description || null, quantity: item.quantity,
+          unit: item.unit || 'pcs', price: item.price, total: item.quantity * item.price,
         })),
       });
     }
@@ -127,6 +111,7 @@ const update = async (req, res) => {
       include: { client: true, items: true },
     });
 
+    await logActivity(req.user.id, 'Mengupdate SPH', 'SPH', sph.id, `${sph.number}`);
     res.json({ success: true, data: sph });
   } catch (error) {
     console.error(error);
@@ -136,7 +121,9 @@ const update = async (req, res) => {
 
 const remove = async (req, res) => {
   try {
+    const sph = await prisma.sph.findUnique({ where: { id: req.params.id }, include: { client: true } });
     await prisma.sph.delete({ where: { id: req.params.id } });
+    await logActivity(req.user.id, 'Menghapus SPH', 'SPH', req.params.id, sph ? `${sph.number}` : req.params.id);
     res.json({ success: true, message: 'SPH deleted' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });

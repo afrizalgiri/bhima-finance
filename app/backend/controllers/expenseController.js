@@ -1,5 +1,6 @@
 const { validationResult } = require('express-validator');
 const { generateExpensePdf } = require('../services/pdfService');
+const { logActivity } = require('../utils/activityLog');
 const prisma = require('../lib/prisma');
 
 const getAll = async (req, res) => {
@@ -37,9 +38,8 @@ const create = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
   try {
-    const expense = await prisma.expense.create({
-      data: { ...req.body, date: new Date(req.body.date) },
-    });
+    const expense = await prisma.expense.create({ data: { ...req.body, date: new Date(req.body.date) } });
+    await logActivity(req.user.id, 'Menambah Pengeluaran', 'Pengeluaran', expense.id, expense.name);
     res.status(201).json({ success: true, data: expense });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -51,6 +51,7 @@ const update = async (req, res) => {
     const data = { ...req.body };
     if (data.date) data.date = new Date(data.date);
     const expense = await prisma.expense.update({ where: { id: req.params.id }, data });
+    await logActivity(req.user.id, 'Mengupdate Pengeluaran', 'Pengeluaran', expense.id, expense.name);
     res.json({ success: true, data: expense });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -59,39 +60,35 @@ const update = async (req, res) => {
 
 const remove = async (req, res) => {
   try {
+    const expense = await prisma.expense.findUnique({ where: { id: req.params.id } });
     await prisma.expense.delete({ where: { id: req.params.id } });
+    await logActivity(req.user.id, 'Menghapus Pengeluaran', 'Pengeluaran', req.params.id, expense ? expense.name : null);
     res.json({ success: true, message: 'Expense deleted' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
-// Generate PDF Bukti Pengeluaran Kas
 const generatePdf = async (req, res) => {
   try {
     const { ids, department, requestBy, period } = req.body;
-
     let expenses;
     if (ids && ids.length > 0) {
       expenses = await prisma.expense.findMany({ where: { id: { in: ids } }, orderBy: { date: 'asc' } });
     } else {
       expenses = await prisma.expense.findMany({ orderBy: { date: 'asc' } });
     }
-
     if (expenses.length === 0) {
       return res.status(400).json({ success: false, message: 'Tidak ada data pengeluaran' });
     }
-
     const company = await prisma.companySetting.findFirst();
     const filters = { department, requestBy, period };
     const pdfBuffer = await generateExpensePdf(expenses, company, filters);
-
     const now = new Date();
     const prefix = company?.docPrefixExpense || 'BKK';
-    const filename = `${prefix}-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.pdf`;
-
+    const filename = prefix + '-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '.pdf';
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
     res.send(pdfBuffer);
   } catch (error) {
     console.error(error);

@@ -9,16 +9,51 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      String   @default("STAFF")
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String        @id @default(uuid())
+  name           String
+  email          String        @unique
+  password       String
+  role           String        @default("STAFF")
+  isActive       Boolean       @default(true)
+  canViewHistory Boolean       @default(false)
+  canViewSalary  Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  activityLogs   ActivityLog[]
+  payrolls       Payroll[]
 
   @@map("users")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@map("activity_logs")
+}
+
+model Payroll {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  month      Int
+  year       Int
+  baseSalary Float    @default(0)
+  allowances Float    @default(0)
+  deductions Float    @default(0)
+  netSalary  Float    @default(0)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, month, year])
+  @@map("payrolls")
 }
 
 model CompanySetting {

@@ -1,21 +1,14 @@
 const { validationResult } = require('express-validator');
-const { Prisma } = require('@prisma/client');
+const { logActivity } = require('../utils/activityLog');
 const prisma = require('../lib/prisma');
 
 const updateInvoiceStatus = async (invoiceId) => {
-  const invoice = await prisma.invoice.findUnique({
-    where: { id: invoiceId },
-    include: { payments: true },
-  });
+  const invoice = await prisma.invoice.findUnique({ where: { id: invoiceId }, include: { payments: true } });
   const paidAmount = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
   let status = 'UNPAID';
   if (paidAmount >= Number(invoice.total)) status = 'PAID';
   else if (paidAmount > 0) status = 'PARTIAL';
-
-  await prisma.invoice.update({
-    where: { id: invoiceId },
-    data: { paidAmount, status },
-  });
+  await prisma.invoice.update({ where: { id: invoiceId }, data: { paidAmount, status } });
 };
 
 const getAll = async (req, res) => {
@@ -36,18 +29,15 @@ const getAll = async (req, res) => {
 const create = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
-
   try {
     const { invoiceId, amount, date, method, reference, notes } = req.body;
-
     const invoice = await prisma.invoice.findUnique({ where: { id: invoiceId } });
     if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
-
     const payment = await prisma.payment.create({
       data: { invoiceId, amount, date: new Date(date), method: method || 'TRANSFER', reference, notes },
     });
-
     await updateInvoiceStatus(invoiceId);
+    await logActivity(req.user.id, 'Mencatat Pembayaran', 'Pembayaran', payment.id, 'Invoice ' + invoice.number);
     res.status(201).json({ success: true, data: payment });
   } catch (error) {
     console.error(error);
@@ -59,9 +49,9 @@ const remove = async (req, res) => {
   try {
     const payment = await prisma.payment.findUnique({ where: { id: req.params.id } });
     if (!payment) return res.status(404).json({ success: false, message: 'Payment not found' });
-
     await prisma.payment.delete({ where: { id: req.params.id } });
     await updateInvoiceStatus(payment.invoiceId);
+    await logActivity(req.user.id, 'Menghapus Pembayaran', 'Pembayaran', req.params.id, null);
     res.json({ success: true, message: 'Payment deleted' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });

@@ -9,11 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { toast } from '../../components/ui/toaster';
-import { UserPlus, Pencil, Trash2, KeyRound, ShieldCheck, User } from 'lucide-react';
+import { UserPlus, Pencil, Trash2, KeyRound, ShieldCheck, User, Shield } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface UserData {
-  id: string; name: string; email: string; role: string; isActive: boolean; createdAt: string;
+  id: string; name: string; email: string; role: string; isActive: boolean; canViewHistory: boolean; canViewSalary: boolean; createdAt: string;
 }
 
 export default function UsersPage() {
@@ -27,6 +27,7 @@ export default function UsersPage() {
   const [newPassword, setNewPassword] = useState('');
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'STAFF' });
   const [saving, setSaving] = useState(false);
+  const [permUser, setPermUser] = useState<UserData | null>(null);
 
   useEffect(() => {
     if (me && me.role !== 'ADMIN') { router.push('/dashboard'); return; }
@@ -75,6 +76,16 @@ export default function UsersPage() {
     } finally { setSaving(false); }
   };
 
+  const savePermissions = async (u: UserData) => {
+    try {
+      await api.put(`/users/${u.id}/permissions`, { canViewHistory: u.canViewHistory, canViewSalary: u.canViewSalary });
+      toast({ title: `Izin ${u.name} diperbarui` });
+      setPermUser(null); fetchUsers();
+    } catch (err: any) {
+      toast({ title: 'Gagal memperbarui izin', variant: 'destructive' });
+    }
+  };
+
   const deleteUser = async (u: UserData) => {
     if (!confirm(`Hapus user "${u.name}"? Tindakan ini tidak bisa dibatalkan.`)) return;
     try {
@@ -116,10 +127,13 @@ export default function UsersPage() {
                   <div className="text-sm text-gray-500">{u.email}</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant={u.role === 'ADMIN' ? 'default' : 'secondary'}>{u.role}</Badge>
                 <Badge variant={u.isActive ? 'default' : 'destructive'} className={u.isActive ? 'bg-green-100 text-green-700' : ''}>{u.isActive ? 'Aktif' : 'Nonaktif'}</Badge>
+                {u.canViewHistory && <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">Lihat History</span>}
+                {u.canViewSalary && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Lihat Gaji</span>}
                 <Button variant="ghost" size="sm" onClick={() => setEditUser({ ...u })} title="Edit"><Pencil size={15} /></Button>
+                {u.id !== me?.id && <Button variant="ghost" size="sm" onClick={() => setPermUser({ ...u })} title="Kelola Izin"><Shield size={15} /></Button>}
                 <Button variant="ghost" size="sm" onClick={() => { setResetUser(u); setNewPassword(''); }} title="Reset Password"><KeyRound size={15} /></Button>
                 {u.id !== me?.id && (
                   <Button variant="ghost" size="sm" onClick={() => deleteUser(u)} className="text-red-500 hover:text-red-700" title="Hapus"><Trash2 size={15} /></Button>
@@ -177,6 +191,42 @@ export default function UsersPage() {
                 <Button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700">{saving ? 'Menyimpan...' : 'Simpan'}</Button>
               </div>
             </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Kelola Izin */}
+      <Dialog open={!!permUser} onOpenChange={v => !v && setPermUser(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Kelola Izin — {permUser?.name}</DialogTitle></DialogHeader>
+          {permUser && (
+            <div className="space-y-4 mt-2">
+              <p className="text-sm text-gray-500">Atur izin akses khusus untuk user ini.</p>
+              <div className="space-y-3">
+                <label className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                  <div>
+                    <div className="font-medium text-sm">Lihat Riwayat Aktivitas</div>
+                    <div className="text-xs text-gray-500">Dapat mengakses halaman History semua aktivitas</div>
+                  </div>
+                  <input type="checkbox" checked={permUser.canViewHistory}
+                    onChange={e => setPermUser({...permUser, canViewHistory: e.target.checked})}
+                    className="w-4 h-4 rounded accent-blue-600" />
+                </label>
+                <label className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                  <div>
+                    <div className="font-medium text-sm">Lihat Angka Gaji</div>
+                    <div className="text-xs text-gray-500">Dapat melihat jumlah gaji di halaman Slip Gaji</div>
+                  </div>
+                  <input type="checkbox" checked={permUser.canViewSalary}
+                    onChange={e => setPermUser({...permUser, canViewSalary: e.target.checked})}
+                    className="w-4 h-4 rounded accent-blue-600" />
+                </label>
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <Button type="button" variant="outline" onClick={() => setPermUser(null)}>Batal</Button>
+                <Button onClick={() => savePermissions(permUser)} className="bg-blue-600 hover:bg-blue-700">Simpan Izin</Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>

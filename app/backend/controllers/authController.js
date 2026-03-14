@@ -11,7 +11,7 @@ const login = async (req, res) => {
 
   const { email, password } = req.body;
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email }, select: { id: true, name: true, email: true, password: true, role: true, isActive: true, canViewHistory: true, canViewSalary: true } });
     if (!user || !user.isActive) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
@@ -30,7 +30,7 @@ const login = async (req, res) => {
     res.json({
       success: true,
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, canViewHistory: user.canViewHistory, canViewSalary: user.canViewSalary },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
