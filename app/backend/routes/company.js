@@ -25,5 +25,6 @@ router.use(authenticate);
 router.get('/', ctrl.getSettings);
 router.put('/', ctrl.updateSettings);
 router.post('/logo', upload.single('logo'), ctrl.uploadLogo);
+router.get('/backup', ctrl.exportBackup);
 
 module.exports = router;

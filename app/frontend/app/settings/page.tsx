@@ -6,7 +6,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { toast } from '../../components/ui/toaster';
-import { Upload } from 'lucide-react';
+import { Upload, Download } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function SettingsPage() {
@@ -22,6 +22,7 @@ export default function SettingsPage() {
   const [uploading, setUploading] = useState(false);
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [pwLoading, setPwLoading] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -81,6 +82,25 @@ export default function SettingsPage() {
     } catch (err: any) {
       toast({ title: err.response?.data?.message || 'Gagal mengubah password', variant: 'destructive' });
     } finally { setPwLoading(false); }
+  };
+
+  const downloadBackup = async () => {
+    setBackupLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${apiUrl}/company/backup`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Gagal mengambil data backup');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bhima-finance-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast({ title: 'Backup berhasil didownload' });
+    } catch { toast({ title: 'Gagal download backup', variant: 'destructive' }); }
+    finally { setBackupLoading(false); }
   };
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -189,6 +209,16 @@ export default function SettingsPage() {
 
         <div className="mt-4"><Button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700">{saving ? 'Menyimpan...' : 'Simpan Pengaturan'}</Button></div>
       </form>
+
+      <Card className="mt-4 border-amber-200 bg-amber-50">
+        <CardHeader><CardTitle className="text-base text-amber-800">Backup Data</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-amber-700">Download semua data (klien, produk, SPH, invoice, pembayaran, pengeluaran) ke komputer Anda sebagai file JSON. Simpan sebagai cadangan jika hosting bermasalah.</p>
+          <Button type="button" onClick={downloadBackup} disabled={backupLoading} className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2">
+            <Download size={16} />{backupLoading ? 'Menyiapkan...' : 'Download Backup'}
+          </Button>
+        </CardContent>
+      </Card>
 
       <form onSubmit={changePassword}>
         <Card className="mt-4">

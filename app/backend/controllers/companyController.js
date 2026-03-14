@@ -51,4 +51,32 @@ const uploadLogo = async (req, res) => {
   }
 };
 
-module.exports = { getSettings, updateSettings, uploadLogo };
+const exportBackup = async (req, res) => {
+  try {
+    const [company, clients, products, sphs, invoices, payments, expenses] = await Promise.all([
+      prisma.companySetting.findFirst(),
+      prisma.client.findMany({ orderBy: { createdAt: 'asc' } }),
+      prisma.product.findMany({ orderBy: { createdAt: 'asc' } }),
+      prisma.sPH.findMany({ include: { client: true, items: true }, orderBy: { createdAt: 'asc' } }),
+      prisma.invoice.findMany({ include: { client: true, items: true }, orderBy: { createdAt: 'asc' } }),
+      prisma.payment.findMany({ include: { invoice: { include: { client: true } } }, orderBy: { createdAt: 'asc' } }),
+      prisma.expense.findMany({ orderBy: { date: 'asc' } }),
+    ]);
+
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      version: '1.0',
+      data: { company, clients, products, sphs, invoices, payments, expenses },
+    };
+
+    const filename = `bhima-finance-backup-${new Date().toISOString().slice(0,10)}.json`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/json');
+    res.json(backup);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+module.exports = { getSettings, updateSettings, uploadLogo, exportBackup };
