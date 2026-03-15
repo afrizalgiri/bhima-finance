@@ -71,7 +71,7 @@ const remove = async (req, res) => {
 
 const generatePdf = async (req, res) => {
   try {
-    const { ids, department, requestBy, period } = req.body;
+    const { ids, department, requestBy, period, signatureIds } = req.body;
     let expenses;
     if (ids && ids.length > 0) {
       expenses = await prisma.expense.findMany({ where: { id: { in: ids } }, orderBy: { date: 'asc' } });
@@ -83,7 +83,21 @@ const generatePdf = async (req, res) => {
     }
     const company = await prisma.companySetting.findFirst();
     const filters = { department, requestBy, period };
-    const pdfBuffer = await generateExpensePdf(expenses, company, filters);
+
+    // Fetch signatures for the 3 slots [menyetujui, mengetahui, penerima]
+    let signaturesData = [null, null, null];
+    if (signatureIds && Array.isArray(signatureIds)) {
+      for (let i = 0; i < 3; i++) {
+        const sid = signatureIds[i];
+        if (sid) {
+          try {
+            signaturesData[i] = await prisma.signature.findUnique({ where: { id: sid } });
+          } catch (e) {}
+        }
+      }
+    }
+
+    const pdfBuffer = await generateExpensePdf(expenses, company, filters, signaturesData);
     const now = new Date();
     const prefix = company?.docPrefixExpense || 'BKK';
     const filename = prefix + '-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '.pdf';

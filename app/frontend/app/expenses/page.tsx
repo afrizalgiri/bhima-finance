@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '../../lib/api';
+
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -25,6 +27,7 @@ const DEPARTMENTS = ['Finance', 'Marketing', 'Operasional', 'HRD', 'IT', 'Direks
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [signatures, setSignatures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
@@ -34,14 +37,19 @@ export default function ExpensesPage() {
   const [total, setTotal] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [pdfForm, setPdfForm] = useState({ department: '', requestBy: '', period: '' });
+  const [pdfSignatureIds, setPdfSignatureIds] = useState(['', '', '']);
   const [generating, setGenerating] = useState(false);
 
   const fetchExpenses = async () => {
     setLoading(true);
     try {
-      const r = await api.get('/expenses', { params: { limit: 200 } });
+      const [r, sigr] = await Promise.all([
+        api.get('/expenses', { params: { limit: 200 } }),
+        api.get('/signatures'),
+      ]);
       setExpenses(r.data.data);
       setTotal(r.data.data.reduce((s: number, e: Expense) => s + Number(e.amount), 0));
+      setSignatures(sigr.data.data);
     } finally { setLoading(false); }
   };
 
@@ -86,7 +94,8 @@ export default function ExpensesPage() {
     setGenerating(true);
     try {
       const ids = selectedIds.length > 0 ? selectedIds : expenses.map(e => e.id);
-      const r = await api.post('/expenses/pdf', { ids, ...pdfForm }, { responseType: 'blob' });
+      const signatureIds = pdfSignatureIds.map(id => id || null);
+      const r = await api.post('/expenses/pdf', { ids, ...pdfForm, signatureIds }, { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([r.data], { type: 'application/pdf' }));
       const a = document.createElement('a');
       const now = new Date();
@@ -108,7 +117,7 @@ export default function ExpensesPage() {
           <p className="text-gray-500 text-sm">Catat dan kelola pengeluaran harian</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { setPdfForm({ department: '', requestBy: '', period: '' }); setPdfDialogOpen(true); }}
+          <Button variant="outline" onClick={() => { setPdfForm({ department: '', requestBy: '', period: '' }); setPdfSignatureIds(['', '', '']); setPdfDialogOpen(true); }}
             className="border-green-600 text-green-700 hover:bg-green-50">
             <FileDown size={16} />
             {selectedIds.length > 0 ? `Download PDF (${selectedIds.length})` : 'Download PDF'}
@@ -261,9 +270,35 @@ export default function ExpensesPage() {
               <Label>Periode</Label>
               <Input value={pdfForm.period} onChange={e => setPdfForm({...pdfForm, period: e.target.value})} placeholder="Contoh: Maret 2026" className="mt-1" />
             </div>
-            <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500">
-              PDF akan berisi tanda tangan 3 pihak:<br/>
-              <strong>Menyetujui</strong> · <strong>Mengetahui</strong> · <strong>Penerima/PIC</strong>
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Tanda Tangan Digital (opsional)</p>
+              {[
+                { label: 'Menyetujui', hint: 'Direktur / Manager', idx: 0 },
+                { label: 'Mengetahui', hint: 'Finance Manager', idx: 1 },
+                { label: 'Penerima / PIC', hint: 'Nama & Tanda Tangan', idx: 2 },
+              ].map(({ label, hint, idx }) => {
+                const selectedSig = signatures.find((s: any) => s.id === pdfSignatureIds[idx]);
+                return (
+                  <div key={idx}>
+                    <Label className="text-xs">{label} <span className="text-gray-400">({hint})</span></Label>
+                    <select
+                      value={pdfSignatureIds[idx]}
+                      onChange={e => { const arr = [...pdfSignatureIds]; arr[idx] = e.target.value; setPdfSignatureIds(arr); }}
+                      className="mt-1 w-full rounded-md border border-input px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                      <option value="">-- Tanpa TTD --</option>
+                      {signatures.map((s: any) => (
+                        <option key={s.id} value={s.id}>{s.name}{s.title ? ` (${s.title})` : ''}</option>
+                      ))}
+                    </select>
+                    {selectedSig && (
+                      <div className="mt-1 flex items-center gap-2 p-1.5 bg-gray-50 rounded border border-gray-100">
+                        <img src={`${API_BASE}${selectedSig.imageUrl}`} alt={selectedSig.name} className="h-8 object-contain" />
+                        <span className="text-xs text-gray-600">{selectedSig.name}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setPdfDialogOpen(false)} className="flex-1">Batal</Button>

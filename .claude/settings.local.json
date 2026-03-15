@@ -58,7 +58,13 @@
       "Bash(ssh -V)",
       "Bash(cd /tmp)",
       "Bash(npm init -y)",
-      "Bash(npm install ssh2)"
+      "Bash(npm install ssh2)",
+      "Bash(node deploy_ttd.js)",
+      "Read(//tmp/**)",
+      "Bash(npm list -g ssh2)",
+      "Bash(node -e \"require\\(''ssh2''\\); console.log\\(''ok''\\)\")",
+      "Bash(npm root -g)",
+      "Bash(node find_path.js)"
     ]
   }
 }

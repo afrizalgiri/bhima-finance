@@ -456,7 +456,7 @@ const generateInvoicePdf = (invoice, company, docName = 'INVOICE') => new Promis
 // ═══════════════════════════════════════════════════════
 //  BUKTI PENGELUARAN KAS — FORM KAS KELUAR DENGAN TTD
 // ═══════════════════════════════════════════════════════
-const generateExpensePdf = (expenses, company, filters, docName = 'Bukti Pengeluaran Kas') => new Promise((resolve, reject) => {
+const generateExpensePdf = (expenses, company, filters, signaturesData = [null, null, null], docName = 'Bukti Pengeluaran Kas') => new Promise((resolve, reject) => {
   const doc = buildPdf((err, buf) => err ? reject(err) : resolve(buf));
 
   const NAVY = '#1a3557';
@@ -569,25 +569,47 @@ const generateExpensePdf = (expenses, company, filters, docName = 'Bukti Pengelu
   y += 6;
   const sigW = CW / 3 - 10;
   const sigPositions = [
-    { x: M, label: 'Menyetujui', sublabel: '(Direktur / Manager)' },
-    { x: M + CW / 3 + 5, label: 'Mengetahui', sublabel: '(Finance Manager)' },
-    { x: M + (CW / 3) * 2 + 10, label: 'Penerima / PIC', sublabel: '(Nama & Tanda Tangan)' },
+    { x: M, label: 'Menyetujui', sublabel: '(Direktur / Manager)', sig: signaturesData[0] },
+    { x: M + CW / 3 + 5, label: 'Mengetahui', sublabel: '(Finance Manager)', sig: signaturesData[1] },
+    { x: M + (CW / 3) * 2 + 10, label: 'Penerima / PIC', sublabel: '(Nama & Tanda Tangan)', sig: signaturesData[2] },
   ];
 
-  sigPositions.forEach(({ x, label, sublabel }) => {
-    doc.rect(x, y, sigW, 75).fillColor('#fafafa').fill();
-    doc.rect(x, y, sigW, 75).strokeColor('#ccc').lineWidth(0.5).stroke();
+  sigPositions.forEach(({ x, label, sublabel, sig }) => {
+    const boxH = 85;
+    doc.rect(x, y, sigW, boxH).fillColor('#fafafa').fill();
+    doc.rect(x, y, sigW, boxH).strokeColor('#ccc').lineWidth(0.5).stroke();
     doc.rect(x, y, sigW, 18).fillColor(NAVY).fill();
     doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#fff')
       .text(label, x + 4, y + 5, { width: sigW - 8, align: 'center' });
-    doc.fontSize(7.5).font('Helvetica').fillColor('#888')
-      .text(sublabel, x + 4, y + 21, { width: sigW - 8, align: 'center' });
-    doc.moveTo(x + 10, y + 65).lineTo(x + sigW - 10, y + 65).lineWidth(0.8).strokeColor('#999').stroke();
-    doc.fontSize(7.5).font('Helvetica').fillColor('#888')
-      .text('(                                            )', x + 4, y + 67, { width: sigW - 8, align: 'center' });
+
+    if (sig) {
+      // Show name under header
+      doc.fontSize(7.5).font('Helvetica').fillColor('#555')
+        .text(sig.name, x + 4, y + 21, { width: sigW - 8, align: 'center' });
+      // Signature image
+      const sigImgPath = getSignatureImagePath(sig);
+      if (sigImgPath) {
+        try {
+          doc.image(sigImgPath, x + (sigW - 60) / 2, y + 30, { width: 60, height: 32, fit: [60, 32] });
+        } catch (e) {}
+      }
+    } else {
+      doc.fontSize(7.5).font('Helvetica').fillColor('#888')
+        .text(sublabel, x + 4, y + 21, { width: sigW - 8, align: 'center' });
+    }
+
+    // Signing line
+    doc.moveTo(x + 8, y + boxH - 16).lineTo(x + sigW - 8, y + boxH - 16).lineWidth(0.8).strokeColor('#999').stroke();
+    if (sig?.title) {
+      doc.fontSize(7).font('Helvetica').fillColor('#666')
+        .text(sig.title, x + 4, y + boxH - 13, { width: sigW - 8, align: 'center' });
+    } else {
+      doc.fontSize(7.5).font('Helvetica').fillColor('#888')
+        .text('(                                        )', x + 4, y + boxH - 13, { width: sigW - 8, align: 'center' });
+    }
   });
 
-  y += 85;
+  y += 95;
 
   // ── CATATAN BAWAH ──────────────────────────────────
   doc.rect(M, y, CW, 1).fillColor('#ddd').fill();
