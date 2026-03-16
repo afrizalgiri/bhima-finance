@@ -327,8 +327,8 @@ const generateInvoicePdf = (invoice, company, docName = 'INVOICE') => new Promis
   y += 90;
 
   // ── TABEL ITEM ────────────────────────────────────
-  const cols = { no: M, desc: M + 22, qty: M + 265, sat: M + 320, price: M + 370, total: M + 450 };
-  const cw = { no: 22, desc: 243, qty: 55, sat: 50, price: 80, total: CW - 450 };
+  const cols = { no: M, desc: M + 22, qty: M + 237, sat: M + 285, price: M + 330, total: M + 413 };
+  const cw = { no: 22, desc: 215, qty: 48, sat: 45, price: 83, total: CW - 413 };
   const rh = 20;
 
   doc.rect(M, y, CW, rh).fillColor(INV_HEADER_COLOR).fill();
@@ -353,10 +353,10 @@ const generateInvoicePdf = (invoice, company, docName = 'INVOICE') => new Promis
         .text(item.description, cols.desc + 3, doc.y, { width: cw.desc - 6 });
     }
     doc.fontSize(8.5).font('Helvetica').fillColor('#222')
-      .text(Number(item.quantity).toString(), cols.qty + 3, y + 6, { width: cw.qty - 6, align: 'center' })
-      .text(item.unit, cols.sat + 3, y + 6, { width: cw.sat - 6, align: 'center' })
-      .text(`Rp ${Number(item.price).toLocaleString('id-ID')}`, cols.price + 3, y + 6, { width: cw.price - 6, align: 'right' })
-      .text(`Rp ${Number(item.total).toLocaleString('id-ID')}`, cols.total + 3, y + 6, { width: cw.total - 6, align: 'right' });
+      .text(Number(item.quantity).toString(), cols.qty + 3, y + 6, { width: cw.qty - 6, align: 'center', lineBreak: false })
+      .text(item.unit, cols.sat + 3, y + 6, { width: cw.sat - 6, align: 'center', lineBreak: false })
+      .text(`Rp ${Number(item.price).toLocaleString('id-ID')}`, cols.price + 3, y + 6, { width: cw.price - 6, align: 'right', lineBreak: false })
+      .text(`Rp ${Number(item.total).toLocaleString('id-ID')}`, cols.total + 3, y + 6, { width: cw.total - 6, align: 'right', lineBreak: false });
     y += rh;
   });
 
