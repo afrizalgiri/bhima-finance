@@ -29,6 +29,7 @@ export default function FormTokenPage() {
     project: '',
     description: '',
     name: '',
+    email: '',
     beneficiary: '',
     bankNorek: '',
     rfpCategory: 'OTHERS',
@@ -214,10 +215,16 @@ export default function FormTokenPage() {
           <div className="px-6 py-5 border-b">
             <h3 className="text-sm font-semibold text-blue-900 uppercase tracking-wide mb-4">Data Pemohon</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
+              <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">NAME / PIC <span className="text-red-500">*</span></label>
                 <input type="text" required value={form.name} onChange={e => set('name', e.target.value)}
                   placeholder="Nama lengkap pemohon..."
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">EMAIL <span className="text-xs font-normal text-gray-400">(untuk notifikasi persetujuan)</span></label>
+                <input type="email" value={form.email} onChange={e => set('email', e.target.value)}
+                  placeholder="email@example.com"
                   className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>

@@ -68,7 +68,8 @@
       "Bash(node deploy2.js)",
       "WebFetch(domain:docs.google.com)",
       "Bash(node -e \":*)",
-      "Bash(python deploy_vps.py)"
+      "Bash(python deploy_vps.py)",
+      "Bash(npm install nodemailer)"
     ]
   }
 }

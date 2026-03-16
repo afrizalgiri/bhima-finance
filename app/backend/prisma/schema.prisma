@@ -252,6 +252,7 @@ model ExpenseRequest {
   project          String?
   description      String?
   name             String
+  email            String?
   beneficiary      String?
   bankNorek        String?
   rfpCategory      String               @default("OTHERS")

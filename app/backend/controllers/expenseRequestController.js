@@ -1,6 +1,7 @@
 const { generateRfpPdf } = require('../services/pdfService');
 const { generateRfpNumber } = require('../utils/numberGenerator');
 const { logActivity } = require('../utils/activityLog');
+const { sendRfpStatusEmail } = require('../services/emailService');
 const prisma = require('../lib/prisma');
 
 const RFP_CATEGORIES = ['SALTAB_EVENT', 'CLAIM_REIMBURSEMENT', 'CASH_ADVANCE', 'SUPPORT_BUDGET', 'OTHERS'];
@@ -51,7 +52,7 @@ const getOne = async (req, res) => {
 // PUBLIC - no auth required, but requires valid one-time token
 const create = async (req, res) => {
   try {
-    const { date, dueDate, detailsOfPayment, project, description, name, beneficiary, bankNorek, rfpCategory, items, notes, formToken } = req.body;
+    const { date, dueDate, detailsOfPayment, project, description, name, email, beneficiary, bankNorek, rfpCategory, items, notes, formToken } = req.body;
 
     // Validate one-time token
     if (!formToken) {
@@ -77,7 +78,8 @@ const create = async (req, res) => {
         detailsOfPayment: detailsOfPayment || null,
         project: project || null,
         description: description || null,
-        name, beneficiary: beneficiary || null,
+        name, email: email || null,
+        beneficiary: beneficiary || null,
         bankNorek: bankNorek || null,
         rfpCategory: rfpCategory || 'OTHERS',
         notes: notes || null,
@@ -108,6 +110,13 @@ const updateStatus = async (req, res) => {
       include: { items: true },
     });
     await logActivity(req.user.id, `Update Status RFP → ${status}`, 'RFP', rfp.id, rfp.number);
+
+    // Send email notification if status is APPROVED, VERIFIED, or REJECTED
+    if (['APPROVED', 'VERIFIED', 'REJECTED'].includes(status) && rfp.email) {
+      const company = await prisma.companySetting.findFirst();
+      sendRfpStatusEmail(rfp, status, notes, company).catch(e => console.error('[Email]', e));
+    }
+
     res.json({ success: true, data: rfp });
   } catch (e) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -136,7 +145,6 @@ const generatePdf = async (req, res) => {
     const company = await prisma.companySetting.findFirst();
     const { signatureIds } = req.body;
 
-    // Fetch 4 signatures [prepared, verified, sm_finance, approved]
     let signaturesData = [null, null, null, null];
     if (signatureIds && Array.isArray(signatureIds)) {
       for (let i = 0; i < 4; i++) {
