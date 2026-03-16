@@ -2,7 +2,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../lib/api';
-import { Search, Eye, Trash2, Download, RefreshCw, ExternalLink, Copy } from 'lucide-react';
+import {
+  Search, Eye, Trash2, Download, RefreshCw, Copy, Plus,
+  CheckCircle2, Clock, Link2, ChevronDown, ChevronUp,
+} from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
@@ -31,11 +34,12 @@ interface RfpItem { id: string; description: string; amount: number; }
 interface Rfp {
   id: string; number: string; date: string; dueDate?: string;
   detailsOfPayment?: string; project?: string; description?: string;
-  name: string; beneficiary?: string; bankNorek?: string;
+  name: string; email?: string; beneficiary?: string; bankNorek?: string;
   rfpCategory: string; status: string; notes?: string;
   items: RfpItem[]; createdAt: string;
 }
 interface Signature { id: string; name: string; title?: string; imageUrl: string; }
+interface FormToken { id: string; token: string; label: string | null; usedAt: string | null; createdAt: string; }
 
 export default function ExpenseRequestsPage() {
   const { user } = useAuth();
@@ -52,11 +56,15 @@ export default function ExpenseRequestsPage() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [statusUpdate, setStatusUpdate] = useState({ status: '', notes: '' });
   const [updating, setUpdating] = useState(false);
-  const [copied, setCopied] = useState(false);
 
-  const publicFormUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/form`
-    : '/form';
+  // Token state
+  const [tokens, setTokens] = useState<FormToken[]>([]);
+  const [newLabel, setNewLabel] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [copiedId, setCopiedId] = useState('');
+  const [showLinkPanel, setShowLinkPanel] = useState(true);
+
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://bhima.sbs';
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -70,6 +78,13 @@ export default function ExpenseRequestsPage() {
     finally { setLoading(false); }
   }, [search, statusFilter]);
 
+  const fetchTokens = useCallback(async () => {
+    try {
+      const res = await api.get('/form-tokens');
+      if (res.data.success) setTokens(res.data.data);
+    } catch (e) {}
+  }, []);
+
   const fetchSignatures = useCallback(async () => {
     try {
       const res = await api.get('/signatures');
@@ -78,7 +93,27 @@ export default function ExpenseRequestsPage() {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
-  useEffect(() => { fetchSignatures(); }, [fetchSignatures]);
+  useEffect(() => { fetchTokens(); fetchSignatures(); }, [fetchTokens, fetchSignatures]);
+
+  const generateLink = async () => {
+    setGenerating(true);
+    try {
+      const res = await api.post('/form-tokens', { label: newLabel.trim() || null });
+      if (res.data.success) { setNewLabel(''); fetchTokens(); }
+    } catch (e) {}
+    finally { setGenerating(false); }
+  };
+
+  const deleteToken = async (id: string) => {
+    await api.delete(`/form-tokens/${id}`);
+    fetchTokens();
+  };
+
+  const copyLink = (token: string, id: string) => {
+    navigator.clipboard.writeText(`${origin}/form/${token}`);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(''), 2500);
+  };
 
   const openDetail = (rfp: Rfp) => {
     setSelected(rfp);
@@ -91,10 +126,7 @@ export default function ExpenseRequestsPage() {
     setUpdating(true);
     try {
       const res = await api.put(`/expense-requests/${selected.id}/status`, statusUpdate);
-      if (res.data.success) {
-        setSelected(res.data.data);
-        fetchAll();
-      }
+      if (res.data.success) { setSelected(res.data.data); fetchAll(); }
     } catch (e) {}
     finally { setUpdating(false); }
   };
@@ -113,54 +145,150 @@ export default function ExpenseRequestsPage() {
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const res = await fetch(`${API_BASE}/api/expense-requests/${selected.id}/pdf`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ signatureIds: pdfSigIds.map(id => id || null) }),
       });
       if (!res.ok) throw new Error('Gagal');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `RFP-${selected.number.replace(/\//g, '-')}.pdf`;
-      a.click();
+      a.href = url; a.download = `RFP-${selected.number.replace(/\//g, '-')}.pdf`; a.click();
       URL.revokeObjectURL(url);
       setShowPdfDialog(false);
     } catch (e) { alert('Gagal download PDF'); }
     finally { setPdfLoading(false); }
   };
 
-  const copyFormLink = () => {
-    navigator.clipboard.writeText(publicFormUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const grandTotal = (rfp: Rfp) => rfp.items.reduce((s, i) => s + Number(i.amount), 0);
+  const activeTokens = tokens.filter(t => !t.usedAt);
+  const usedTokens = tokens.filter(t => t.usedAt);
 
   return (
     <div className="space-y-4">
+
+      {/* ── HEADER ── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Request for Payment</h1>
           <p className="text-sm text-gray-500">{total} permintaan pembayaran</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={copyFormLink}
-            className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200"
-          >
-            {copied ? <><Copy size={15} /> Tersalin!</> : <><ExternalLink size={15} /> Link Form Public</>}
-          </button>
-          <button onClick={fetchAll} className="p-2 rounded-lg hover:bg-gray-100">
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
-        </div>
+        <button onClick={fetchAll} className="p-2 rounded-lg hover:bg-gray-100">
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+        </button>
       </div>
 
-      {/* Filters */}
+      {/* ── LINK GENERATOR PANEL ── */}
+      <div className="bg-white rounded-xl border overflow-hidden">
+        <button
+          onClick={() => setShowLinkPanel(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Link2 size={16} className="text-blue-600" />
+            <span className="font-semibold text-sm text-gray-800">Buat Link Form untuk Anggota Tim</span>
+            {activeTokens.length > 0 && (
+              <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                {activeTokens.length} aktif
+              </span>
+            )}
+          </div>
+          {showLinkPanel ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+        </button>
+
+        {showLinkPanel && (
+          <div className="border-t px-5 py-4 space-y-4">
+            <p className="text-xs text-gray-500">
+              Setiap link hanya bisa digunakan <strong>1 kali</strong> oleh 1 orang. Buat link baru untuk setiap anggota yang ingin mengajukan pembayaran.
+            </p>
+
+            {/* Generate input */}
+            <div className="flex gap-2">
+              <input
+                className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Label (nama orang / keperluan) — contoh: Budi - Bensin Maret"
+                value={newLabel}
+                onChange={e => setNewLabel(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && generateLink()}
+              />
+              <button
+                onClick={generateLink}
+                disabled={generating}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 shrink-0"
+              >
+                <Plus size={14} />
+                {generating ? 'Membuat...' : 'Buat Link'}
+              </button>
+            </div>
+
+            {/* Active tokens */}
+            {activeTokens.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2 flex items-center gap-1">
+                  <Clock size={11} /> Link Aktif — belum digunakan ({activeTokens.length})
+                </p>
+                <div className="space-y-2">
+                  {activeTokens.map(t => (
+                    <div key={t.id} className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        {t.label && <p className="text-sm font-semibold text-gray-800 mb-0.5">{t.label}</p>}
+                        <p className="text-xs text-gray-500 font-mono truncate">{origin}/form/{t.token}</p>
+                      </div>
+                      <button
+                        onClick={() => copyLink(t.token, t.id)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg shrink-0 transition-colors ${
+                          copiedId === t.id
+                            ? 'bg-green-600 text-white'
+                            : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {copiedId === t.id
+                          ? <><CheckCircle2 size={12} /> Tersalin! Bagikan ke WA</>
+                          : <><Copy size={12} /> Salin Link</>}
+                      </button>
+                      <button onClick={() => deleteToken(t.id)}
+                        className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0" title="Hapus">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Used tokens */}
+            {usedTokens.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase mb-2 flex items-center gap-1">
+                  <CheckCircle2 size={11} /> Sudah Digunakan ({usedTokens.length})
+                </p>
+                <div className="space-y-1.5">
+                  {usedTokens.slice(0, 5).map(t => (
+                    <div key={t.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm text-gray-500">{t.label || '(tanpa label)'}</span>
+                        <span className="text-xs text-gray-400 ml-2">
+                          · digunakan {new Date(t.usedAt!).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
+                        </span>
+                      </div>
+                      <button onClick={() => deleteToken(t.id)} className="p-1 text-gray-300 hover:text-red-400 shrink-0">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {tokens.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-1">
+                Belum ada link. Buat link baru di atas untuk dibagikan ke anggota tim.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── FILTERS ── */}
       <div className="flex gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -184,7 +312,7 @@ export default function ExpenseRequestsPage() {
         </select>
       </div>
 
-      {/* Table */}
+      {/* ── TABLE ── */}
       <div className="bg-white rounded-xl border overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b">
@@ -208,7 +336,10 @@ export default function ExpenseRequestsPage() {
               <tr key={rfp.id} className="border-b hover:bg-gray-50">
                 <td className="px-4 py-3 font-mono text-xs font-medium">{rfp.number}</td>
                 <td className="px-4 py-3 text-gray-600">{fmtDate(rfp.date)}</td>
-                <td className="px-4 py-3 font-medium">{rfp.name}</td>
+                <td className="px-4 py-3">
+                  <div className="font-medium">{rfp.name}</div>
+                  {rfp.email && <div className="text-xs text-gray-400">{rfp.email}</div>}
+                </td>
                 <td className="px-4 py-3 text-gray-600">{rfp.project || '-'}</td>
                 <td className="px-4 py-3 text-xs text-gray-500">{CATEGORY_LABELS[rfp.rfpCategory] || rfp.rfpCategory}</td>
                 <td className="px-4 py-3 text-right font-medium">{fmt(grandTotal(rfp))}</td>
@@ -239,30 +370,28 @@ export default function ExpenseRequestsPage() {
         </table>
       </div>
 
-      {/* Detail Modal */}
+      {/* ── DETAIL MODAL ── */}
       {showDetail && selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl">
             <div className="p-5 border-b flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold">{selected.number}</h2>
-                <p className="text-sm text-gray-500">Request for Payment</p>
+                <p className="text-sm text-gray-500">Request for Payment · {selected.name}</p>
               </div>
               <button onClick={() => setShowDetail(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
             </div>
-
             <div className="p-5 space-y-4">
-              {/* Info grid */}
               <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
                 {([
                   ['Date', fmtDate(selected.date)],
                   ['Due Date', selected.dueDate ? fmtDate(selected.dueDate) : '-'],
                   ['Name / PIC', selected.name],
+                  ['Email', selected.email || '-'],
                   ['Beneficiary', selected.beneficiary || '-'],
                   ['Bank / Norek', selected.bankNorek || '-'],
                   ['Project', selected.project || '-'],
                   ['Details of Payment', selected.detailsOfPayment || '-'],
-                  ['Description', selected.description || '-'],
                   ['Category', CATEGORY_LABELS[selected.rfpCategory] || selected.rfpCategory],
                 ] as [string, string][]).map(([k, v]) => (
                   <div key={k}>
@@ -272,7 +401,6 @@ export default function ExpenseRequestsPage() {
                 ))}
               </div>
 
-              {/* Items table */}
               <div>
                 <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Items</div>
                 <table className="w-full text-sm border rounded-lg overflow-hidden">
@@ -299,7 +427,6 @@ export default function ExpenseRequestsPage() {
                 </table>
               </div>
 
-              {/* Status update */}
               <div className="border rounded-lg p-4 bg-gray-50">
                 <div className="text-sm font-semibold text-gray-700 mb-3">Update Status</div>
                 <div className="grid grid-cols-2 gap-3">
@@ -326,28 +453,28 @@ export default function ExpenseRequestsPage() {
                     />
                   </div>
                 </div>
-                <button
-                  onClick={handleUpdateStatus}
-                  disabled={updating}
-                  className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {updating ? 'Menyimpan...' : 'Update Status'}
-                </button>
+                <div className="flex items-center gap-2 mt-3">
+                  <button onClick={handleUpdateStatus} disabled={updating}
+                    className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                    {updating ? 'Menyimpan...' : 'Update Status'}
+                  </button>
+                  {selected.email && (
+                    <span className="text-xs text-gray-400">
+                      📧 Notifikasi email otomatis → {selected.email}
+                    </span>
+                  )}
+                </div>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => { setShowDetail(false); setPdfSigIds(['', '', '', '']); setShowPdfDialog(true); }}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-                >
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">
                   <Download size={15} /> Download PDF
                 </button>
                 {user?.role === 'ADMIN' && (
-                  <button
-                    onClick={() => handleDelete(selected.id)}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                  >
+                  <button onClick={() => handleDelete(selected.id)}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">
                     <Trash2 size={15} /> Hapus
                   </button>
                 )}
@@ -357,7 +484,7 @@ export default function ExpenseRequestsPage() {
         </div>
       )}
 
-      {/* PDF Signature Dialog */}
+      {/* ── PDF DIALOG ── */}
       {showPdfDialog && selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-xl w-full max-w-lg shadow-xl">
@@ -382,19 +509,14 @@ export default function ExpenseRequestsPage() {
                   </select>
                   {pdfSigIds[idx] && (() => {
                     const sig = signatures.find(s => s.id === pdfSigIds[idx]);
-                    return sig ? (
-                      <img src={`${API_BASE}/${sig.imageUrl}`} alt="ttd" className="mt-1 h-10 object-contain" />
-                    ) : null;
+                    return sig ? <img src={`${API_BASE}/${sig.imageUrl}`} alt="ttd" className="mt-1 h-10 object-contain" /> : null;
                   })()}
                 </div>
               ))}
               <div className="flex gap-2 justify-end pt-2">
                 <button onClick={() => setShowPdfDialog(false)} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Batal</button>
-                <button
-                  onClick={handleDownloadPdf}
-                  disabled={pdfLoading}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
+                <button onClick={handleDownloadPdf} disabled={pdfLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
                   <Download size={15} />
                   {pdfLoading ? 'Generating...' : 'Download PDF'}
                 </button>
