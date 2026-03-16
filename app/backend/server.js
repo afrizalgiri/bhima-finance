@@ -19,6 +19,7 @@ const activityRoutes = require('./routes/activity');
 const payrollRoutes = require('./routes/payroll');
 const signatureRoutes = require('./routes/signatures');
 const expenseRequestRoutes = require('./routes/expenseRequests');
+const formTokenRoutes = require('./routes/formTokens');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -53,6 +54,7 @@ app.use('/api/activity', activityRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/signatures', signatureRoutes);
 app.use('/api/expense-requests', expenseRequestRoutes);
+app.use('/api/form-tokens', formTokenRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -48,10 +48,19 @@ const getOne = async (req, res) => {
   }
 };
 
-// PUBLIC - no auth required
+// PUBLIC - no auth required, but requires valid one-time token
 const create = async (req, res) => {
   try {
-    const { date, dueDate, detailsOfPayment, project, description, name, beneficiary, bankNorek, rfpCategory, items, notes } = req.body;
+    const { date, dueDate, detailsOfPayment, project, description, name, beneficiary, bankNorek, rfpCategory, items, notes, formToken } = req.body;
+
+    // Validate one-time token
+    if (!formToken) {
+      return res.status(401).json({ success: false, message: 'Link tidak valid atau sudah digunakan' });
+    }
+    const ft = await prisma.formToken.findUnique({ where: { token: formToken } });
+    if (!ft) return res.status(404).json({ success: false, message: 'Link tidak valid' });
+    if (ft.usedAt) return res.status(410).json({ success: false, message: 'Link ini sudah pernah digunakan', used: true });
+
     if (!name || !date || !items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Nama, tanggal, dan minimal 1 item wajib diisi' });
     }
@@ -59,6 +68,7 @@ const create = async (req, res) => {
     if (validItems.length === 0) {
       return res.status(400).json({ success: false, message: 'Minimal 1 item dengan jumlah harus diisi' });
     }
+
     const number = await generateRfpNumber('RFP');
     const rfp = await prisma.expenseRequest.create({
       data: {
@@ -75,6 +85,10 @@ const create = async (req, res) => {
       },
       include: { items: true },
     });
+
+    // Mark token as used
+    await prisma.formToken.update({ where: { token: formToken }, data: { usedAt: new Date() } });
+
     res.status(201).json({ success: true, data: rfp, message: `Request berhasil dikirim! No: ${rfp.number}` });
   } catch (e) {
     console.error(e);

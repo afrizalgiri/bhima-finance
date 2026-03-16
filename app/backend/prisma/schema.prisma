@@ -274,3 +274,14 @@ model ExpenseRequestItem {
 
   @@map("expense_request_items")
 }
+
+model FormToken {
+  id          String    @id @default(uuid())
+  token       String    @unique
+  label       String?
+  usedAt      DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  @@map("form_tokens")
+}
