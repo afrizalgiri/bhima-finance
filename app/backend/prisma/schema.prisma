@@ -242,3 +242,35 @@ model Expense {
 
   @@map("expenses")
 }
+
+model ExpenseRequest {
+  id               String               @id @default(uuid())
+  number           String               @unique
+  date             DateTime
+  dueDate          DateTime?
+  detailsOfPayment String?
+  project          String?
+  description      String?
+  name             String
+  beneficiary      String?
+  bankNorek        String?
+  rfpCategory      String               @default("OTHERS")
+  status           String               @default("PENDING")
+  notes            String?
+  items            ExpenseRequestItem[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@map("expense_requests")
+}
+
+model ExpenseRequestItem {
+  id          String         @id @default(uuid())
+  requestId   String
+  request     ExpenseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  description String
+  amount      Float          @default(0)
+  createdAt   DateTime       @default(now())
+
+  @@map("expense_request_items")
+}

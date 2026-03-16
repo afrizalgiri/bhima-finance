@@ -64,7 +64,9 @@
       "Bash(npm list -g ssh2)",
       "Bash(node -e \"require\\(''ssh2''\\); console.log\\(''ok''\\)\")",
       "Bash(npm root -g)",
-      "Bash(node find_path.js)"
+      "Bash(node find_path.js)",
+      "Bash(node deploy2.js)",
+      "WebFetch(domain:docs.google.com)"
     ]
   }
 }

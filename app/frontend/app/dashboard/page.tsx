@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import api from '../../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { formatCurrency, formatDate, INVOICE_STATUS } from '../../lib/utils';
-import { TrendingUp, TrendingDown, AlertCircle, Receipt, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertCircle, Receipt, DollarSign, ClipboardList, Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -24,11 +24,36 @@ export default function DashboardPage() {
     { title: 'Cashflow', value: formatCurrency(data?.cashflow || 0), sub: 'Pemasukan - Pengeluaran', icon: DollarSign, color: (data?.cashflow || 0) >= 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50' },
   ];
 
+  const [copied, setCopied] = useState(false);
+  const publicFormUrl = typeof window !== 'undefined' ? `${window.location.origin}/form` : '/form';
+  const copyLink = () => { navigator.clipboard.writeText(publicFormUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm">Ringkasan keuangan bulan berjalan</p>
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500 text-sm">Ringkasan keuangan bulan berjalan</p>
+        </div>
+        {/* RFP Public Form Banner */}
+        <div className="flex items-center gap-3 bg-blue-900 text-white px-4 py-2.5 rounded-xl shadow-sm">
+          <ClipboardList size={18} className="shrink-0" />
+          <div>
+            <p className="text-xs font-semibold">Link Form Request for Payment</p>
+            <p className="text-xs text-blue-300 truncate max-w-[200px]">{publicFormUrl}</p>
+          </div>
+          <div className="flex gap-1">
+            <button onClick={copyLink} title="Salin link"
+              className="p-1.5 rounded-lg hover:bg-blue-800 transition-colors">
+              <Copy size={14} />
+            </button>
+            <Link href="/form" target="_blank" title="Buka form"
+              className="p-1.5 rounded-lg hover:bg-blue-800 transition-colors">
+              <ExternalLink size={14} />
+            </Link>
+          </div>
+          {copied && <span className="text-xs text-green-300 font-medium">Tersalin!</span>}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">

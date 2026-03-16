@@ -624,4 +624,211 @@ const generateExpensePdf = (expenses, company, filters, signaturesData = [null, 
   doc.end();
 });
 
-module.exports = { generateSphPdf, generateInvoicePdf, generateExpensePdf };
+// ═══════════════════════════════════════════════════════
+//  REQUEST FOR PAYMENT — FORMAT RFP FORMAL
+// ═══════════════════════════════════════════════════════
+const generateRfpPdf = (rfp, company, signaturesData = [null, null, null, null]) => new Promise((resolve, reject) => {
+  const doc = buildPdf((err, buf) => err ? reject(err) : resolve(buf));
+
+  const NAVY = '#1a3557';
+  const GOLD = '#c9a84c';
+  const LIGHT = '#f0f4f8';
+
+  const logo = getLogoBuffer(company);
+
+  // ── KOP SURAT ──────────────────────────────────────
+  doc.rect(M, M, CW, 4).fillColor(NAVY).fill();
+  doc.rect(M, M + 6, CW, 1.5).fillColor(GOLD).fill();
+
+  let headerY = M + 18;
+  if (logo) {
+    try { doc.image(logo, M, headerY, { height: 50, fit: [75, 50] }); } catch (e) {}
+  }
+
+  doc.fontSize(15).font('Helvetica-Bold').fillColor(NAVY)
+    .text(company?.name || 'PT. NAMA PERUSAHAAN', M, headerY + 2, { width: CW, align: 'center' });
+  doc.fontSize(8).font('Helvetica').fillColor('#444')
+    .text(company?.address || '', M, doc.y + 2, { width: CW, align: 'center' })
+    .text(`Telp: ${company?.phone || '-'}  |  Email: ${company?.email || '-'}`, M, doc.y + 1, { width: CW, align: 'center' });
+
+  const kopBottom = doc.y + 8;
+  doc.rect(M, kopBottom, CW, 1.5).fillColor(GOLD).fill();
+  doc.rect(M, kopBottom + 3, CW, 4).fillColor(NAVY).fill();
+
+  // ── JUDUL ──────────────────────────────────────────
+  let y = kopBottom + 16;
+  doc.fontSize(13).font('Helvetica-Bold').fillColor(NAVY)
+    .text('REQUEST FOR PAYMENT', M, y, { width: CW, align: 'center', underline: true });
+  y = doc.y + 3;
+  doc.fontSize(9).font('Helvetica').fillColor('#666')
+    .text(`No. ${rfp.number}`, M, y, { width: CW, align: 'center' });
+  y = doc.y + 12;
+
+  // ── INFO FIELDS (2 kolom) ──────────────────────────
+  const lx = M, rx = M + CW / 2 + 10;
+  const fw = CW / 2 - 20;
+  const lineH = 14;
+
+  const leftFields = [
+    ['DATE', rfp.date ? formatDate(rfp.date) : '-'],
+    ['DUE DATE', rfp.dueDate ? formatDate(rfp.dueDate) : '-'],
+    ['DETAILS OF PAYMENT', rfp.detailsOfPayment || '-'],
+    ['PROJECT', rfp.project || '-'],
+  ];
+  const rightFields = [
+    ['NAME', rfp.name || '-'],
+    ['BENEFICIARY', rfp.beneficiary || '-'],
+    ['BANK / NOREK', rfp.bankNorek || '-'],
+    ['DESCRIPTION', rfp.description || '-'],
+  ];
+
+  let ly = y, ry = y;
+  leftFields.forEach(([k, v]) => {
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#444').text(k, lx, ly, { width: 90 });
+    doc.fontSize(8).font('Helvetica').fillColor('#222').text(':', lx + 90, ly, { width: 8 })
+      .text(v, lx + 100, ly, { width: fw - 100 });
+    ly += lineH;
+  });
+  rightFields.forEach(([k, v]) => {
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#444').text(k, rx, ry, { width: 90 });
+    doc.fontSize(8).font('Helvetica').fillColor('#222').text(':', rx + 90, ry, { width: 8 })
+      .text(v, rx + 100, ry, { width: fw - 100 });
+    ry += lineH;
+  });
+  y = Math.max(ly, ry) + 12;
+
+  // ── TABEL ITEM ─────────────────────────────────────
+  const rh = 18;
+  const colNo = M, colDesc = M + 28, colAmt = M + CW - 120;
+  const wNo = 28, wDesc = CW - 148, wAmt = 120;
+
+  doc.rect(M, y, CW, rh).fillColor(NAVY).fill();
+  doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#fff')
+    .text('No', colNo + 4, y + 5, { width: wNo - 8, align: 'center' })
+    .text('Description', colDesc + 4, y + 5, { width: wDesc - 8 })
+    .text('Amount (Rp)', colAmt + 4, y + 5, { width: wAmt - 8, align: 'right' });
+  y += rh;
+
+  let grandTotal = 0;
+  (rfp.items || []).forEach((item, i) => {
+    const bg = i % 2 === 0 ? '#f7f9fc' : '#fff';
+    doc.rect(M, y, CW, rh).fillColor(bg).fill();
+    doc.rect(M, y, CW, rh).strokeColor('#dde3ea').lineWidth(0.4).stroke();
+    grandTotal += Number(item.amount || 0);
+    doc.fontSize(8.5).font('Helvetica').fillColor('#222')
+      .text(String(i + 1), colNo + 4, y + 5, { width: wNo - 8, align: 'center' })
+      .text(item.description || '', colDesc + 4, y + 5, { width: wDesc - 8 })
+      .text(Number(item.amount || 0).toLocaleString('id-ID'), colAmt + 4, y + 5, { width: wAmt - 8, align: 'right' });
+    y += rh;
+  });
+
+  // TOTAL row
+  doc.rect(M, y, CW, rh + 2).fillColor(NAVY).fill();
+  doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#fff')
+    .text('TOTAL', colNo + 4, y + 6, { width: wNo + wDesc - 8 })
+    .text(`Rp ${grandTotal.toLocaleString('id-ID')}`, colAmt + 4, y + 6, { width: wAmt - 8, align: 'right' });
+  y += rh + 2 + 12;
+
+  // ── CATEGORY CHECKBOXES ─────────────────────────────
+  const categories = ['SALTAB EVENT', 'CLAIM / REIMBURSEMENT', 'OTHERS', 'CASH ADVANCE / UANG MUKA', 'SUPPORT BUDGET'];
+  const selectedCat = (rfp.rfpCategory || 'OTHERS').toUpperCase();
+
+  doc.fontSize(8.5).font('Helvetica-Bold').fillColor(NAVY).text('CATEGORY:', M, y);
+  y = doc.y + 4;
+
+  let cx = M;
+  categories.forEach((cat) => {
+    const checked = selectedCat === cat;
+    // checkbox box
+    doc.rect(cx, y + 1, 10, 10).strokeColor('#333').lineWidth(0.8).stroke();
+    if (checked) {
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(NAVY).text('✓', cx + 1, y, { width: 10, align: 'center' });
+    }
+    doc.fontSize(7.5).font('Helvetica').fillColor('#333')
+      .text(cat, cx + 14, y + 2);
+    cx += doc.widthOfString(cat) + 30;
+    if (cx > M + CW - 120) { cx = M; y += 16; }
+  });
+  y += 16;
+
+  // ── NOTES ─────────────────────────────────────────
+  if (rfp.notes) {
+    doc.rect(M, y, CW, 1).fillColor('#ddd').fill();
+    y += 6;
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#444').text('Notes:', M, y);
+    doc.fontSize(8).font('Helvetica').fillColor('#666').text(rfp.notes, M, doc.y + 2, { width: CW });
+    y = doc.y + 10;
+  }
+
+  // ── 4 APPROVAL BLOCKS ──────────────────────────────
+  y += 8;
+  const approvalSlots = [
+    { label: 'PREPARED / PIC', sub: 'Admin', sig: signaturesData[0] },
+    { label: 'VERIFIED / FINANCE', sub: 'AP / Treasury / AR', sig: signaturesData[1] },
+    { label: 'SM FINANCE', sub: '', sig: signaturesData[2] },
+    { label: 'APPROVED', sub: 'Direktur Utama', sig: signaturesData[3] },
+  ];
+
+  const blockW = CW / 4 - 4;
+  const blockH = 95;
+  const blockGap = (CW - blockW * 4) / 3;
+
+  approvalSlots.forEach(({ label, sub, sig }, idx) => {
+    const bx = M + idx * (blockW + blockGap);
+
+    doc.rect(bx, y, blockW, blockH).fillColor('#fafafa').fill();
+    doc.rect(bx, y, blockW, blockH).strokeColor('#ccc').lineWidth(0.5).stroke();
+    doc.rect(bx, y, blockW, 20).fillColor(NAVY).fill();
+
+    // label
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#fff')
+      .text(label, bx + 3, y + 5, { width: blockW - 6, align: 'center' });
+    if (sub) {
+      doc.fontSize(6.5).font('Helvetica').fillColor('#cce').text(sub, bx + 3, doc.y + 1, { width: blockW - 6, align: 'center' });
+    }
+
+    const innerY = y + 22;
+
+    if (sig) {
+      // name above image
+      doc.fontSize(7).font('Helvetica').fillColor('#444')
+        .text(sig.name, bx + 3, innerY, { width: blockW - 6, align: 'center' });
+      const sigImgPath = getSignatureImagePath(sig);
+      if (sigImgPath) {
+        try {
+          doc.image(sigImgPath, bx + (blockW - 55) / 2, innerY + 10, { width: 55, height: 28, fit: [55, 28] });
+        } catch (e) {}
+      }
+    }
+
+    // DATE row
+    doc.fontSize(6.5).font('Helvetica').fillColor('#888')
+      .text('Date:', bx + 4, y + blockH - 28, { width: blockW - 8 });
+    doc.moveTo(bx + 4, y + blockH - 18).lineTo(bx + blockW - 4, y + blockH - 18)
+      .lineWidth(0.6).strokeColor('#aaa').stroke();
+
+    // REMARKS row
+    doc.fontSize(6.5).font('Helvetica').fillColor('#888')
+      .text('Remarks:', bx + 4, y + blockH - 13, { width: blockW - 8 });
+    if (sig?.title) {
+      doc.fontSize(6.5).font('Helvetica').fillColor('#555')
+        .text(sig.title, bx + 3, y + blockH - 13, { width: blockW - 6, align: 'right' });
+    }
+  });
+
+  y += blockH + 10;
+
+  // ── CATATAN BAWAH ──────────────────────────────────
+  doc.rect(M, y, CW, 1).fillColor('#ddd').fill();
+  y += 6;
+  doc.fontSize(7.5).font('Helvetica').fillColor('#999')
+    .text('Dokumen ini merupakan permintaan pembayaran resmi. Harap simpan sebagai arsip keuangan.', M, y, { width: CW, align: 'center' });
+
+  // Footer bar
+  doc.rect(M, PAGE_H - M - 8, CW, 1.5).fillColor(GOLD).fill();
+  doc.rect(M, PAGE_H - M - 4, CW, 4).fillColor(NAVY).fill();
+
+  doc.end();
+});
+
+module.exports = { generateSphPdf, generateInvoicePdf, generateExpensePdf, generateRfpPdf };
