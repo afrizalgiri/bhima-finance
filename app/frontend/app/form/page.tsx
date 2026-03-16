@@ -1,8 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Plus, Trash2, Send, CheckCircle } from 'lucide-react';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+import api from '../../lib/api';
 
 const CATEGORIES = [
   { value: 'SALTAB_EVENT', label: 'SALTAB EVENT' },
@@ -55,22 +54,17 @@ export default function PublicFormPage() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/expense-requests/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          items: validItems.map(it => ({ description: it.description, amount: parseFloat(it.amount) })),
-        }),
+      const res = await api.post('/expense-requests/submit', {
+        ...form,
+        items: validItems.map(it => ({ description: it.description, amount: parseFloat(it.amount) })),
       });
-      const data = await res.json();
-      if (data.success) {
-        setSuccess(data.message || 'Request berhasil dikirim!');
+      if (res.data.success) {
+        setSuccess(res.data.message || 'Request berhasil dikirim!');
       } else {
-        setError(data.message || 'Gagal mengirim request');
+        setError(res.data.message || 'Gagal mengirim request');
       }
-    } catch (e) {
-      setError('Koneksi gagal. Coba lagi.');
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Koneksi gagal. Coba lagi.');
     } finally {
       setLoading(false);
     }
