@@ -1,9 +1,10 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { Search, Filter, Eye, Trash2, Download, RefreshCw, ExternalLink, Copy } from 'lucide-react';
+import api from '../../lib/api';
+import { Search, Eye, Trash2, Download, RefreshCw, ExternalLink, Copy } from 'lucide-react';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-800',
@@ -37,7 +38,7 @@ interface Rfp {
 interface Signature { id: string; name: string; title?: string; imageUrl: string; }
 
 export default function ExpenseRequestsPage() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [rfps, setRfps] = useState<Rfp[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -58,29 +59,23 @@ export default function ExpenseRequestsPage() {
     : '/form';
 
   const fetchAll = useCallback(async () => {
-    if (!token) return;
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: '100' });
-      if (search) params.set('search', search);
-      if (statusFilter) params.set('status', statusFilter);
-      const res = await fetch(`${API_BASE}/api/expense-requests?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success) { setRfps(data.data); setTotal(data.total); }
+      const params: Record<string, string> = { limit: '100' };
+      if (search) params.search = search;
+      if (statusFilter) params.status = statusFilter;
+      const res = await api.get('/expense-requests', { params });
+      if (res.data.success) { setRfps(res.data.data); setTotal(res.data.total); }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, [token, search, statusFilter]);
+  }, [search, statusFilter]);
 
   const fetchSignatures = useCallback(async () => {
-    if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/api/signatures`, { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      if (data.success) setSignatures(data.data);
+      const res = await api.get('/signatures');
+      if (res.data.success) setSignatures(res.data.data);
     } catch (e) {}
-  }, [token]);
+  }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
   useEffect(() => { fetchSignatures(); }, [fetchSignatures]);
@@ -92,17 +87,12 @@ export default function ExpenseRequestsPage() {
   };
 
   const handleUpdateStatus = async () => {
-    if (!selected || !token) return;
+    if (!selected) return;
     setUpdating(true);
     try {
-      const res = await fetch(`${API_BASE}/api/expense-requests/${selected.id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(statusUpdate),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSelected(data.data);
+      const res = await api.put(`/expense-requests/${selected.id}/status`, statusUpdate);
+      if (res.data.success) {
+        setSelected(res.data.data);
         fetchAll();
       }
     } catch (e) {}
@@ -110,24 +100,26 @@ export default function ExpenseRequestsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!token || !confirm('Hapus request ini?')) return;
-    await fetch(`${API_BASE}/api/expense-requests/${id}`, {
-      method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
-    });
+    if (!confirm('Hapus request ini?')) return;
+    await api.delete(`/expense-requests/${id}`);
     fetchAll();
     if (selected?.id === id) setShowDetail(false);
   };
 
   const handleDownloadPdf = async () => {
-    if (!selected || !token) return;
+    if (!selected) return;
     setPdfLoading(true);
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const res = await fetch(`${API_BASE}/api/expense-requests/${selected.id}/pdf`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ signatureIds: pdfSigIds.map(id => id || null) }),
       });
-      if (!res.ok) throw new Error('Gagal generate PDF');
+      if (!res.ok) throw new Error('Gagal');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -262,7 +254,7 @@ export default function ExpenseRequestsPage() {
             <div className="p-5 space-y-4">
               {/* Info grid */}
               <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                {[
+                {([
                   ['Date', fmtDate(selected.date)],
                   ['Due Date', selected.dueDate ? fmtDate(selected.dueDate) : '-'],
                   ['Name / PIC', selected.name],
@@ -272,7 +264,7 @@ export default function ExpenseRequestsPage() {
                   ['Details of Payment', selected.detailsOfPayment || '-'],
                   ['Description', selected.description || '-'],
                   ['Category', CATEGORY_LABELS[selected.rfpCategory] || selected.rfpCategory],
-                ].map(([k, v]) => (
+                ] as [string, string][]).map(([k, v]) => (
                   <div key={k}>
                     <div className="text-xs text-gray-400 uppercase tracking-wide">{k}</div>
                     <div className="font-medium text-gray-800">{v}</div>
