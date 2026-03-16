@@ -62,10 +62,12 @@ const create = async (req, res) => {
     if (!ft) return res.status(404).json({ success: false, message: 'Link tidak valid' });
     if (ft.usedAt) return res.status(410).json({ success: false, message: 'Link ini sudah pernah digunakan', used: true });
 
+    console.log('[RFP submit] items received:', JSON.stringify(items));
     if (!name || !date || !items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Nama, tanggal, dan minimal 1 item wajib diisi' });
     }
     const validItems = items.filter(i => i.description && i.amount > 0);
+    console.log('[RFP submit] validItems after filter:', JSON.stringify(validItems));
     if (validItems.length === 0) {
       return res.status(400).json({ success: false, message: 'Minimal 1 item dengan jumlah harus diisi' });
     }
