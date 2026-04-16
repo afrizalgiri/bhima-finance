@@ -9,19 +9,33 @@ datasource db {
 }
 
 model User {
-  id             String        @id @default(uuid())
-  name           String
-  email          String        @unique
-  password       String
-  role           String        @default("STAFF")
-  isActive       Boolean       @default(true)
-  canViewHistory Boolean       @default(false)
-  canViewSalary  Boolean       @default(false)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  activityLogs   ActivityLog[]
+  id                String           @id @default(uuid())
+  name              String
+  email             String           @unique
+  password          String
+  role              String           @default("STAFF")
+  isActive          Boolean          @default(true)
+  canViewHistory    Boolean          @default(false)
+  canViewSalary     Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  activityLogs      ActivityLog[]
+  otps              Otp[]
+  submittedRequests ExpenseRequest[]
 
   @@map("users")
+}
+
+model Otp {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("otps")
 }
 
 model ActivityLog {
@@ -82,7 +96,7 @@ model Client {
   id        String    @id @default(uuid())
   type      String    @default("COMPANY")
   name      String
-  address   String
+  address   String?
   email     String?
   phone     String?
   pic       String?
@@ -141,10 +155,11 @@ model Sph {
   closingText  String?
   headerColor  String?
   signerTitle  String?
-  signatureId  String?
-  signature    Signature? @relation(fields: [signatureId], references: [id], onDelete: SetNull)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  signatureId    String?
+  signature      Signature? @relation(fields: [signatureId], references: [id], onDelete: SetNull)
+  sectionsConfig Json?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
   @@map("sphs")
 }
@@ -159,8 +174,12 @@ model SphItem {
   description String?
   quantity    Float    @default(1)
   unit        String   @default("pcs")
-  price       Float    @default(0)
-  total       Float    @default(0)
+  price       Float?
+  total       Float?
+  sectionKey  String   @default("main")
+  nomor       String?
+  sortOrder   Int      @default(0)
+  perValue    Float?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -244,23 +263,25 @@ model Expense {
 }
 
 model ExpenseRequest {
-  id               String               @id @default(uuid())
-  number           String               @unique
-  date             DateTime
-  dueDate          DateTime?
-  detailsOfPayment String?
-  project          String?
-  description      String?
-  name             String
-  email            String?
-  beneficiary      String?
-  bankNorek        String?
-  rfpCategory      String               @default("OTHERS")
-  status           String               @default("PENDING")
-  notes            String?
-  items            ExpenseRequestItem[]
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  id                String               @id @default(uuid())
+  number            String               @unique
+  date              DateTime
+  dueDate           DateTime?
+  detailsOfPayment  String?
+  project           String?
+  description       String?
+  name              String
+  email             String?
+  beneficiary       String?
+  bankNorek         String?
+  rfpCategory       String               @default("OTHERS")
+  status            String               @default("PENDING")
+  notes             String?
+  items             ExpenseRequestItem[]
+  submittedByUserId String?
+  submittedBy       User?                @relation(fields: [submittedByUserId], references: [id], onDelete: SetNull)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
   @@map("expense_requests")
 }
@@ -285,4 +306,36 @@ model FormToken {
   createdAt   DateTime  @default(now())
 
   @@map("form_tokens")
+}
+
+// ─── LAMPIRAN ────────────────────────────────────────────
+model Lampiran {
+  id           String            @id @default(uuid())
+  nama         String
+  deskripsi    String?
+  tipe         String            @default("UPLOAD") // UPLOAD | EXCEL | WORD
+  fileUrl      String?           // path relatif, e.g. /uploads/lampiran/xxx.xlsx
+  fileName     String?           // original filename
+  fileSize     Int?
+  mimeType     String?
+  templateData Json?             // untuk EXCEL / WORD builder
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  dokumen      DokumenLampiran[]
+
+  @@map("lampiran")
+}
+
+model DokumenLampiran {
+  id          String   @id @default(uuid())
+  dokumenType String   // sph | invoice | po | kontrak | dll
+  dokumenId   String
+  lampiranId  String
+  lampiran    Lampiran @relation(fields: [lampiranId], references: [id], onDelete: Cascade)
+  urutan      Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@unique([dokumenType, dokumenId, lampiranId])
+  @@index([dokumenType, dokumenId])
+  @@map("dokumen_lampiran")
 }

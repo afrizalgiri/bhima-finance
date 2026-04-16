@@ -129,4 +129,115 @@ async function sendRfpStatusEmail(rfp, status, notes, company) {
   }
 }
 
-module.exports = { sendRfpStatusEmail };
+async function sendOtpEmail(user, otpCode) {
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.log('[Email] SMTP not configured, skipping OTP email');
+    return;
+  }
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f0f4f8;font-family:Arial,sans-serif">
+  <div style="max-width:480px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+    <div style="background:#1a3557;padding:24px 32px">
+      <h1 style="margin:0;color:#fff;font-size:18px;font-weight:700">Bhima Finance</h1>
+      <p style="margin:4px 0 0;color:#93c5fd;font-size:13px">Kode Verifikasi Login</p>
+    </div>
+    <div style="padding:32px">
+      <p style="color:#374151;font-size:15px;margin-top:0">Halo <strong>${user.name}</strong>,</p>
+      <p style="color:#374151;font-size:14px;line-height:1.6">Gunakan kode berikut untuk menyelesaikan login ke Bhima Finance:</p>
+      <div style="text-align:center;margin:28px 0">
+        <div style="display:inline-block;background:#f0f4f8;border:2px dashed #2563eb;border-radius:12px;padding:16px 40px">
+          <span style="font-size:36px;font-weight:800;letter-spacing:10px;color:#1a3557">${otpCode}</span>
+        </div>
+      </div>
+      <p style="color:#6b7280;font-size:13px;text-align:center">Kode berlaku selama <strong>5 menit</strong>. Jangan bagikan kode ini kepada siapapun.</p>
+      <p style="color:#9ca3af;font-size:12px;margin-top:24px">Jika Anda tidak mencoba login, abaikan email ini.</p>
+    </div>
+    <div style="padding:16px 32px 24px;border-top:1px solid #e2e8f0">
+      <p style="margin:0;font-size:12px;color:#9ca3af">Email ini dikirim otomatis oleh sistem Bhima Finance.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    await transporter.sendMail({
+      from: `"Bhima Finance" <${process.env.SMTP_USER}>`,
+      to: user.email,
+      subject: `${otpCode} — Kode Verifikasi Login Bhima Finance`,
+      html,
+    });
+    console.log(`[Email] OTP sent to ${user.email}`);
+  } catch (e) {
+    console.error('[Email] Failed to send OTP:', e.message);
+  }
+}
+
+async function sendWelcomeEmail(user, plainPassword) {
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.log('[Email] SMTP not configured, skipping welcome email');
+    return;
+  }
+
+  const loginUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f0f4f8;font-family:Arial,sans-serif">
+  <div style="max-width:520px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+    <div style="background:#1a3557;padding:24px 32px">
+      <h1 style="margin:0;color:#fff;font-size:18px;font-weight:700">Bhima Finance</h1>
+      <p style="margin:4px 0 0;color:#93c5fd;font-size:13px">Selamat datang!</p>
+    </div>
+    <div style="padding:32px">
+      <p style="color:#374151;font-size:15px;margin-top:0">Halo <strong>${user.name}</strong>,</p>
+      <p style="color:#374151;font-size:14px;line-height:1.6">
+        Akun Anda di <strong>Bhima Finance</strong> telah dibuat. Berikut adalah informasi login Anda:
+      </p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:20px 0">
+        <table style="width:100%;border-collapse:collapse;font-size:14px">
+          <tr>
+            <td style="color:#6b7280;padding:6px 0;width:120px">Email</td>
+            <td style="color:#111827;font-weight:600">${user.email}</td>
+          </tr>
+          <tr>
+            <td style="color:#6b7280;padding:6px 0">Password</td>
+            <td style="color:#111827;font-weight:600;font-family:monospace;font-size:15px">${plainPassword}</td>
+          </tr>
+        </table>
+      </div>
+      <p style="color:#374151;font-size:14px;line-height:1.6">
+        Saat login, Anda akan diminta memasukkan kode OTP yang dikirim ke email ini. Segera ganti password Anda setelah login pertama.
+      </p>
+      <div style="text-align:center;margin:24px 0">
+        <a href="${loginUrl}/login" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">Masuk Sekarang</a>
+      </div>
+    </div>
+    <div style="padding:16px 32px 24px;border-top:1px solid #e2e8f0">
+      <p style="margin:0;font-size:12px;color:#9ca3af">Email ini dikirim otomatis oleh sistem Bhima Finance. Jangan membalas email ini.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    await transporter.sendMail({
+      from: `"Bhima Finance" <${process.env.SMTP_USER}>`,
+      to: user.email,
+      subject: 'Selamat datang di Bhima Finance — Informasi Akun Anda',
+      html,
+    });
+    console.log(`[Email] Welcome email sent to ${user.email}`);
+  } catch (e) {
+    console.error('[Email] Failed to send welcome email:', e.message);
+  }
+}
+
+module.exports = { sendRfpStatusEmail, sendOtpEmail, sendWelcomeEmail };

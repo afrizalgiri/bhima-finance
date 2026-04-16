@@ -167,4 +167,69 @@ const generatePdf = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getOne, create, updateStatus, remove, generatePdf };
+// AUTHENTICATED - employee submits their own RFP (no token needed)
+const submitAuthenticated = async (req, res) => {
+  try {
+    const { date, dueDate, detailsOfPayment, project, description, beneficiary, bankNorek, rfpCategory, items, notes } = req.body;
+
+    if (!date || !items || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'Tanggal dan minimal 1 item wajib diisi' });
+    }
+    const validItems = items.filter(i => i.description && Number(i.amount) > 0);
+    if (validItems.length === 0) {
+      return res.status(400).json({ success: false, message: 'Minimal 1 item dengan jumlah harus diisi' });
+    }
+
+    const number = await generateRfpNumber('RFP');
+    const rfp = await prisma.expenseRequest.create({
+      data: {
+        number,
+        date: new Date(date),
+        dueDate: dueDate ? new Date(dueDate) : null,
+        detailsOfPayment: detailsOfPayment || null,
+        project: project || null,
+        description: description || null,
+        name: req.user.name,
+        email: req.user.email,
+        beneficiary: beneficiary || null,
+        bankNorek: bankNorek || null,
+        rfpCategory: rfpCategory || 'OTHERS',
+        notes: notes || null,
+        submittedByUserId: req.user.id,
+        items: { create: validItems.map(i => ({ description: i.description, amount: Number(i.amount) })) },
+      },
+      include: { items: true },
+    });
+
+    await logActivity(req.user.id, 'Submit RFP', 'RFP', rfp.id, rfp.number);
+    res.status(201).json({ success: true, data: rfp, message: `Request berhasil dikirim! No: ${rfp.number}` });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// AUTHENTICATED - employee views their own submissions
+const mySubmissions = async (req, res) => {
+  try {
+    const { status, page = 1, limit = 50 } = req.query;
+    const where = { submittedByUserId: req.user.id };
+    if (status) where.status = status;
+
+    const [requests, total] = await Promise.all([
+      prisma.expenseRequest.findMany({
+        where,
+        include: { items: true },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * parseInt(limit),
+        take: parseInt(limit),
+      }),
+      prisma.expenseRequest.count({ where }),
+    ]);
+    res.json({ success: true, data: requests, total });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+module.exports = { getAll, getOne, create, updateStatus, remove, generatePdf, submitAuthenticated, mySubmissions };

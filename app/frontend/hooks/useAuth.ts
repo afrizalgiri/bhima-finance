@@ -15,6 +15,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  setAuth: (token: string, user: User) => void;
   logout: () => void;
 }
 
@@ -22,6 +23,7 @@ export const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   login: async () => {},
+  setAuth: () => {},
   logout: () => {},
 });
 
@@ -48,6 +50,12 @@ export const useAuthState = () => {
     setUser(user);
   };
 
+  const setAuth = (token: string, user: User) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    setUser(user);
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -55,5 +63,5 @@ export const useAuthState = () => {
     window.location.href = '/login';
   };
 
-  return { user, loading, login, logout };
+  return { user, loading, login, setAuth, logout };
 };

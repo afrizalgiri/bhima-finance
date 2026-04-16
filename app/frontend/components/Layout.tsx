@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import {
   LayoutDashboard, Users, Package, FileText, Receipt,
   CreditCard, DollarSign, BarChart3, Settings, LogOut, Menu, X, UserCog,
-  History, Banknote, PenLine, ClipboardList
+  History, Banknote, PenLine, ClipboardList, Paperclip
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -17,6 +17,7 @@ const navItems = [
   { href: '/products', label: 'Produk & Layanan', icon: Package },
   { href: '/sph', label: 'SPH', icon: FileText },
   { href: '/invoices', label: 'Invoice', icon: Receipt },
+  { href: '/lampiran', label: 'Lampiran', icon: Paperclip },
   { href: '/payments', label: 'Pembayaran', icon: CreditCard },
   { href: '/expenses', label: 'Pengeluaran', icon: DollarSign },
   { href: '/expense-requests', label: 'Request for Payment', icon: ClipboardList },
@@ -31,8 +32,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) router.push('/login');
-  }, [user, loading, router]);
+    if (!loading && !user) { router.push('/login'); return; }
+    // STAFF can only access /expense-requests
+    if (!loading && user && user.role === 'STAFF' && !pathname.startsWith('/expense-requests')) {
+      router.replace('/expense-requests');
+    }
+  }, [user, loading, router, pathname]);
 
   if (loading || !user) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
 
@@ -55,54 +60,68 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3">
-          {navItems.map(item => {
-            const Icon = item.icon;
-            const active = pathname === item.href || pathname.startsWith(item.href + '/');
-            return (
-              <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
-                className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
-                  active ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
-                )}>
-                <Icon size={18} />
-                {item.label}
-              </Link>
-            );
-          })}
-          {(user.role === 'ADMIN' || user.canViewHistory) && (
-            <Link href="/history" onClick={() => setSidebarOpen(false)}
+          {user.role === 'STAFF' ? (
+            // STAFF: only Request for Payment
+            <Link href="/expense-requests" onClick={() => setSidebarOpen(false)}
               className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
-                pathname === '/history' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
+                pathname.startsWith('/expense-requests') ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
               )}>
-              <History size={18} />
-              Riwayat Aktivitas
+              <ClipboardList size={18} />
+              Request for Payment
             </Link>
-          )}
-          {(user.role === 'ADMIN' || user.canViewSalary) && (
-            <Link href="/payroll" onClick={() => setSidebarOpen(false)}
-              className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
-                pathname === '/payroll' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
-              )}>
-              <Banknote size={18} />
-              Slip Gaji
-            </Link>
-          )}
-          {user.role === 'ADMIN' && (
+          ) : (
+            // ADMIN: full nav
             <>
-              <div className="px-3 pt-3 pb-1 text-xs text-gray-400 uppercase tracking-wide">Admin</div>
-              <Link href="/users" onClick={() => setSidebarOpen(false)}
-                className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
-                  pathname === '/users' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
-                )}>
-                <UserCog size={18} />
-                Manajemen User
-              </Link>
-              <Link href="/signatures" onClick={() => setSidebarOpen(false)}
-                className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
-                  pathname === '/signatures' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
-                )}>
-                <PenLine size={18} />
-                Tanda Tangan Digital
-              </Link>
+              {navItems.map(item => {
+                const Icon = item.icon;
+                const active = pathname === item.href || pathname.startsWith(item.href + '/');
+                return (
+                  <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
+                    className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
+                      active ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
+                    )}>
+                    <Icon size={18} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+              {(user.role === 'ADMIN' || user.canViewHistory) && (
+                <Link href="/history" onClick={() => setSidebarOpen(false)}
+                  className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
+                    pathname === '/history' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
+                  )}>
+                  <History size={18} />
+                  Riwayat Aktivitas
+                </Link>
+              )}
+              {(user.role === 'ADMIN' || user.canViewSalary) && (
+                <Link href="/payroll" onClick={() => setSidebarOpen(false)}
+                  className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
+                    pathname === '/payroll' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
+                  )}>
+                  <Banknote size={18} />
+                  Slip Gaji
+                </Link>
+              )}
+              {user.role === 'ADMIN' && (
+                <>
+                  <div className="px-3 pt-3 pb-1 text-xs text-gray-400 uppercase tracking-wide">Admin</div>
+                  <Link href="/users" onClick={() => setSidebarOpen(false)}
+                    className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
+                      pathname === '/users' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
+                    )}>
+                    <UserCog size={18} />
+                    Manajemen User
+                  </Link>
+                  <Link href="/signatures" onClick={() => setSidebarOpen(false)}
+                    className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
+                      pathname === '/signatures' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
+                    )}>
+                    <PenLine size={18} />
+                    Tanda Tangan Digital
+                  </Link>
+                </>
+              )}
             </>
           )}
         </nav>

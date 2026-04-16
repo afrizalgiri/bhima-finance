@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../lib/prisma');
+const { sendWelcomeEmail } = require('../services/emailService');
 
 const userSelect = { id: true, name: true, email: true, role: true, isActive: true, canViewHistory: true, canViewSalary: true, createdAt: true };
 
@@ -25,6 +26,8 @@ const createUser = async (req, res) => {
       data: { name, email, password: hashed, role: role || 'STAFF' },
       select: userSelect,
     });
+    // Send welcome email with credentials (non-blocking)
+    sendWelcomeEmail({ name, email }, password).catch(() => {});
     res.status(201).json({ success: true, data: user });
   } catch {
     res.status(500).json({ success: false, message: 'Server error' });

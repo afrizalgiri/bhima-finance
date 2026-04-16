@@ -64,6 +64,24 @@ export default function ExpenseRequestsPage() {
   const [copiedId, setCopiedId] = useState('');
   const [showLinkPanel, setShowLinkPanel] = useState(true);
 
+  // STAFF-only state
+  const [staffTab, setStaffTab] = useState<'submit' | 'history'>('submit');
+  const [myRfps, setMyRfps] = useState<Rfp[]>([]);
+  const [myRfpsLoading, setMyRfpsLoading] = useState(false);
+  const [staffSubmitting, setStaffSubmitting] = useState(false);
+  const [staffForm, setStaffForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    dueDate: '',
+    detailsOfPayment: '',
+    project: '',
+    description: '',
+    beneficiary: '',
+    bankNorek: '',
+    rfpCategory: 'OTHERS',
+    notes: '',
+  });
+  const [staffItems, setStaffItems] = useState([{ description: '', amount: '' }]);
+
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://bhima.sbs';
 
   const fetchAll = useCallback(async () => {
@@ -92,8 +110,45 @@ export default function ExpenseRequestsPage() {
     } catch (e) {}
   }, []);
 
+  const fetchMyRfps = useCallback(async () => {
+    setMyRfpsLoading(true);
+    try {
+      const res = await api.get('/expense-requests/my', { params: { limit: '100' } });
+      if (res.data.success) setMyRfps(res.data.data);
+    } catch (e) { console.error(e); }
+    finally { setMyRfpsLoading(false); }
+  }, []);
+
+  const handleStaffSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const validItems = staffItems.filter(i => i.description && Number(i.amount) > 0);
+    if (validItems.length === 0) {
+      alert('Minimal 1 item dengan deskripsi dan jumlah harus diisi');
+      return;
+    }
+    setStaffSubmitting(true);
+    try {
+      const res = await api.post('/expense-requests/my-submit', {
+        ...staffForm,
+        items: validItems.map(i => ({ description: i.description, amount: Number(i.amount) })),
+      });
+      if (res.data.success) {
+        setStaffForm({ date: new Date().toISOString().split('T')[0], dueDate: '', detailsOfPayment: '', project: '', description: '', beneficiary: '', bankNorek: '', rfpCategory: 'OTHERS', notes: '' });
+        setStaffItems([{ description: '', amount: '' }]);
+        setStaffTab('history');
+        fetchMyRfps();
+        alert(`Request berhasil dikirim! Nomor: ${res.data.data.number}`);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Gagal mengirim request');
+    } finally {
+      setStaffSubmitting(false);
+    }
+  };
+
   useEffect(() => { fetchAll(); }, [fetchAll]);
   useEffect(() => { fetchTokens(); fetchSignatures(); }, [fetchTokens, fetchSignatures]);
+  useEffect(() => { if (user?.role === 'STAFF') fetchMyRfps(); }, [user, fetchMyRfps]);
 
   const generateLink = async () => {
     setGenerating(true);
@@ -162,6 +217,182 @@ export default function ExpenseRequestsPage() {
   const grandTotal = (rfp: Rfp) => rfp.items.reduce((s, i) => s + Number(i.amount), 0);
   const activeTokens = tokens.filter(t => !t.usedAt);
   const usedTokens = tokens.filter(t => t.usedAt);
+
+  // ── STAFF VIEW ──
+  if (user?.role === 'STAFF') {
+    return (
+      <div className="space-y-4 max-w-2xl mx-auto">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Request for Payment</h1>
+          <p className="text-sm text-gray-500">Ajukan permintaan pembayaran</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b">
+          {(['submit', 'history'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => { setStaffTab(tab); if (tab === 'history') fetchMyRfps(); }}
+              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${staffTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+              {tab === 'submit' ? 'Submit RFP' : 'Riwayat Saya'}
+              {tab === 'history' && myRfps.length > 0 && (
+                <span className="ml-1.5 bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full">{myRfps.length}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Submit Tab */}
+        {staffTab === 'submit' && (
+          <form onSubmit={handleStaffSubmit} className="space-y-4 bg-white rounded-xl border p-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Tanggal <span className="text-red-500">*</span></label>
+                <input type="date" required value={staffForm.date} onChange={e => setStaffForm(f => ({ ...f, date: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Due Date</label>
+                <input type="date" value={staffForm.dueDate} onChange={e => setStaffForm(f => ({ ...f, dueDate: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Details of Payment / Keperluan</label>
+              <input type="text" value={staffForm.detailsOfPayment} onChange={e => setStaffForm(f => ({ ...f, detailsOfPayment: e.target.value }))}
+                placeholder="Contoh: Pembelian ATK, Transport ke Klien..."
+                className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Proyek</label>
+              <input type="text" value={staffForm.project} onChange={e => setStaffForm(f => ({ ...f, project: e.target.value }))}
+                placeholder="Nama proyek (opsional)"
+                className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Beneficiary / Penerima</label>
+                <input type="text" value={staffForm.beneficiary} onChange={e => setStaffForm(f => ({ ...f, beneficiary: e.target.value }))}
+                  placeholder="Nama penerima pembayaran"
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">No. Rekening Bank</label>
+                <input type="text" value={staffForm.bankNorek} onChange={e => setStaffForm(f => ({ ...f, bankNorek: e.target.value }))}
+                  placeholder="Bank — No. Rek"
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Kategori RFP <span className="text-red-500">*</span></label>
+              <div className="grid grid-cols-1 gap-1.5">
+                {Object.entries(CATEGORY_LABELS).map(([val, label]) => (
+                  <label key={val} className={`flex items-center gap-2.5 px-3 py-2.5 border rounded-lg cursor-pointer text-sm transition-colors ${staffForm.rfpCategory === val ? 'border-blue-500 bg-blue-50 text-blue-700' : 'hover:bg-gray-50'}`}>
+                    <input type="radio" name="rfpCategory" value={val} checked={staffForm.rfpCategory === val}
+                      onChange={() => setStaffForm(f => ({ ...f, rfpCategory: val }))} className="accent-blue-600" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-gray-600 uppercase">Rincian Pembayaran <span className="text-red-500">*</span></label>
+                <button type="button" onClick={() => setStaffItems(items => [...items, { description: '', amount: '' }])}
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium">+ Tambah Item</button>
+              </div>
+              <div className="space-y-2">
+                {staffItems.map((item, idx) => (
+                  <div key={idx} className="flex gap-2 items-start">
+                    <input type="text" placeholder="Deskripsi item" value={item.description}
+                      onChange={e => setStaffItems(items => items.map((it, i) => i === idx ? { ...it, description: e.target.value } : it))}
+                      className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input type="number" placeholder="Jumlah (Rp)" value={item.amount}
+                      onChange={e => setStaffItems(items => items.map((it, i) => i === idx ? { ...it, amount: e.target.value } : it))}
+                      className="w-36 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" />
+                    {staffItems.length > 1 && (
+                      <button type="button" onClick={() => setStaffItems(items => items.filter((_, i) => i !== idx))}
+                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {staffItems.filter(i => i.amount).length > 0 && (
+                <div className="mt-2 text-right text-sm font-semibold text-blue-700">
+                  Total: {fmt(staffItems.reduce((s, i) => s + (Number(i.amount) || 0), 0))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Catatan Tambahan</label>
+              <textarea value={staffForm.notes} onChange={e => setStaffForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="Catatan opsional..."
+                rows={2}
+                className="w-full px-3 py-2 text-sm border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+
+            <button type="submit" disabled={staffSubmitting}
+              className="w-full py-3 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              {staffSubmitting ? 'Mengirim...' : 'Kirim Request for Payment'}
+            </button>
+          </form>
+        )}
+
+        {/* History Tab */}
+        {staffTab === 'history' && (
+          <div className="bg-white rounded-xl border overflow-hidden">
+            {myRfpsLoading ? (
+              <div className="py-10 text-center text-gray-400 text-sm">Memuat...</div>
+            ) : myRfps.length === 0 ? (
+              <div className="py-10 text-center text-gray-400 text-sm">
+                Belum ada submission. Gunakan tab &quot;Submit RFP&quot; untuk mengajukan.
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">No. RFP</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Tanggal</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Keperluan</th>
+                    <th className="px-4 py-3 text-right font-medium text-gray-600">Total</th>
+                    <th className="px-4 py-3 text-center font-medium text-gray-600">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {myRfps.map(rfp => (
+                    <tr key={rfp.id} className="border-b hover:bg-gray-50">
+                      <td className="px-4 py-3 font-mono text-xs font-medium">{rfp.number}</td>
+                      <td className="px-4 py-3 text-gray-600 text-xs">{fmtDate(rfp.date)}</td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm">{rfp.detailsOfPayment || rfp.project || '-'}</div>
+                        <div className="text-xs text-gray-400">{CATEGORY_LABELS[rfp.rfpCategory] || rfp.rfpCategory}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium text-sm">{fmt(grandTotal(rfp))}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[rfp.status] || 'bg-gray-100 text-gray-700'}`}>
+                          {rfp.status}
+                        </span>
+                        {rfp.notes && <div className="text-xs text-gray-400 mt-1 max-w-[150px] mx-auto truncate">{rfp.notes}</div>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

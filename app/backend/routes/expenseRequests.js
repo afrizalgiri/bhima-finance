@@ -8,6 +8,8 @@ router.post('/submit', ctrl.create);
 
 // Auth required for all below
 router.use(authenticate);
+router.get('/my', ctrl.mySubmissions);
+router.post('/my-submit', ctrl.submitAuthenticated);
 router.get('/', ctrl.getAll);
 router.get('/:id', ctrl.getOne);
 router.put('/:id/status', ctrl.updateStatus);
