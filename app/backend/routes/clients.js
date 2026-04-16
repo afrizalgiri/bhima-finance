@@ -10,13 +10,11 @@ router.get('/', ctrl.getAll);
 router.get('/:id', ctrl.getOne);
 router.post('/', [
   body('name').notEmpty().withMessage('Name required'),
-  body('address').notEmpty().withMessage('Address required'),
-  body('email').optional().isEmail().withMessage('Valid email required'),
+  body('email').optional({ checkFalsy: true }).isEmail().withMessage('Valid email required'),
 ], ctrl.create);
 router.put('/:id', [
   body('name').notEmpty().withMessage('Name required'),
-  body('address').notEmpty().withMessage('Address required'),
-  body('email').optional().isEmail(),
+  body('email').optional({ checkFalsy: true }).isEmail(),
 ], ctrl.update);
 router.delete('/:id', ctrl.remove);
 

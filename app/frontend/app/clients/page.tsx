@@ -13,13 +13,13 @@ interface Client {
   id: string;
   type: string;
   name: string;
-  address: string;
+  address?: string;
   email?: string;
   phone?: string;
   pic?: string;
 }
 
-const empty: Omit<Client, 'id'> = { type: 'COMPANY', name: '', address: '', email: '', phone: '', pic: '' };
+const empty = { type: 'COMPANY', name: '', address: '', email: '', phone: '', pic: '' };
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -41,7 +41,7 @@ export default function ClientsPage() {
   useEffect(() => { fetchClients(); }, [search]);
 
   const openAdd = () => { setEditing(null); setForm(empty); setDialogOpen(true); };
-  const openEdit = (c: Client) => { setEditing(c); setForm({ type: c.type || 'COMPANY', name: c.name, address: c.address, email: c.email || '', phone: c.phone || '', pic: c.pic || '' }); setDialogOpen(true); };
+  const openEdit = (c: Client) => { setEditing(c); setForm({ type: c.type || 'COMPANY', name: c.name, address: c.address || '', email: c.email || '', phone: c.phone || '', pic: c.pic || '' }); setDialogOpen(true); };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,7 +151,7 @@ export default function ClientsPage() {
               </div>
             </div>
             <div><Label>{form.type === 'INDIVIDUAL' ? 'Nama *' : 'Nama Perusahaan *'}</Label><Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} required className="mt-1" placeholder={form.type === 'INDIVIDUAL' ? 'Contoh: Budi Santoso' : 'Contoh: PT. Maju Bersama'} /></div>
-            <div><Label>Alamat *</Label><textarea value={form.address} onChange={e => setForm({...form, address: e.target.value})} required rows={2} className="mt-1 w-full rounded-md border border-input px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" /></div>
+            <div><Label>Alamat</Label><textarea value={form.address} onChange={e => setForm({...form, address: e.target.value})} rows={2} className="mt-1 w-full rounded-md border border-input px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" /></div>
             <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="mt-1" /></div>
             <div><Label>Telepon</Label><Input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="mt-1" /></div>
             <div><Label>PIC (Person in Charge)</Label><Input value={form.pic} onChange={e => setForm({...form, pic: e.target.value})} className="mt-1" /></div>

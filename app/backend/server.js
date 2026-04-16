@@ -20,6 +20,7 @@ const payrollRoutes = require('./routes/payroll');
 const signatureRoutes = require('./routes/signatures');
 const expenseRequestRoutes = require('./routes/expenseRequests');
 const formTokenRoutes = require('./routes/formTokens');
+const lampiranRoutes = require('./routes/lampiran');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -55,6 +56,7 @@ app.use('/api/payroll', payrollRoutes);
 app.use('/api/signatures', signatureRoutes);
 app.use('/api/expense-requests', expenseRequestRoutes);
 app.use('/api/form-tokens', formTokenRoutes);
+app.use('/api/lampiran', lampiranRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

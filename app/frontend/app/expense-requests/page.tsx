@@ -246,6 +246,9 @@ export default function ExpenseRequestsPage() {
         {/* Submit Tab */}
         {staffTab === 'submit' && (
           <form onSubmit={handleStaffSubmit} className="space-y-4 bg-white rounded-xl border p-5">
+            <div className="rounded-lg bg-blue-50 border border-blue-100 px-4 py-2.5 text-xs text-blue-700">
+              Notifikasi status pengajuan akan dikirim ke email akun Anda: <strong>{user.email}</strong>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Tanggal <span className="text-red-500">*</span></label>
@@ -350,6 +353,12 @@ export default function ExpenseRequestsPage() {
         {/* History Tab */}
         {staffTab === 'history' && (
           <div className="bg-white rounded-xl border overflow-hidden">
+            <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">Riwayat Pengajuan</span>
+              <button onClick={fetchMyRfps} className="p-1.5 rounded hover:bg-gray-200 transition-colors" title="Refresh">
+                <RefreshCw size={14} className={myRfpsLoading ? 'animate-spin text-blue-600' : 'text-gray-500'} />
+              </button>
+            </div>
             {myRfpsLoading ? (
               <div className="py-10 text-center text-gray-400 text-sm">Memuat...</div>
             ) : myRfps.length === 0 ? (

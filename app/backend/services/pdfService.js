@@ -45,6 +45,39 @@ function buildPdf(cb) {
   return doc;
 }
 
+// Shared kop surat — consistent across all documents.
+// Logo on left (if present), company info fills remaining right area.
+// Returns kopBottom (Y coordinate after the bottom bar).
+function drawKopSurat(doc, company, logo) {
+  const NAVY = '#1a3557';
+  const GOLD = '#c9a84c';
+  const LOGO_AREA_W = 90;
+  const LOGO_H_MAX = 55;
+
+  doc.rect(M, M, CW, 4).fillColor(NAVY).fill();
+  doc.rect(M, M + 6, CW, 1.5).fillColor(GOLD).fill();
+
+  const headerY = M + 16;
+  const textX = logo ? M + LOGO_AREA_W + 8 : M;
+  const textW = logo ? CW - LOGO_AREA_W - 8 : CW;
+
+  if (logo) {
+    try { doc.image(logo, M, headerY, { fit: [LOGO_AREA_W, LOGO_H_MAX] }); } catch (e) {}
+  }
+
+  doc.fontSize(15).font('Helvetica-Bold').fillColor(NAVY)
+    .text(company?.name || 'PT. NAMA PERUSAHAAN', textX, headerY + 2, { width: textW, align: 'center' });
+  doc.fontSize(8).font('Helvetica').fillColor('#444')
+    .text(company?.address || '', textX, doc.y + 2, { width: textW, align: 'center' })
+    .text(`Telp: ${company?.phone || '-'}  |  Email: ${company?.email || '-'}`, textX, doc.y + 1, { width: textW, align: 'center' });
+  if (company?.website) doc.text(`Website: ${company.website}`, textX, doc.y + 1, { width: textW, align: 'center' });
+
+  const kopBottom = Math.max(doc.y, logo ? headerY + LOGO_H_MAX : 0) + 8;
+  doc.rect(M, kopBottom, CW, 1.5).fillColor(GOLD).fill();
+  doc.rect(M, kopBottom + 3, CW, 4).fillColor(NAVY).fill();
+  return kopBottom;
+}
+
 // ═══════════════════════════════════════════════════════
 //  SPH — FORMAT SURAT PENAWARAN HARGA FORMAL INDONESIA
 // ═══════════════════════════════════════════════════════
@@ -58,27 +91,7 @@ const generateSphPdf = (sph, company, docName = 'Surat Penawaran Harga') => new 
   const HEADER_COLOR = sph.headerColor || NAVY;
 
   // ── KOP SURAT ─────────────────────────────────────
-  doc.rect(M, M, CW, 4).fillColor(NAVY).fill();
-  doc.rect(M, M + 6, CW, 1.5).fillColor(GOLD).fill();
-
-  let headerY = M + 18;
-
-  if (logo) {
-    try { doc.image(logo, M, headerY, { height: 55, fit: [90, 55] }); } catch (e) {}
-  }
-
-  // Nama perusahaan (tengah)
-  doc.fontSize(16).font('Helvetica-Bold').fillColor(NAVY)
-    .text(company?.name || 'PT. NAMA PERUSAHAAN', M, headerY + 2, { width: CW, align: 'center' });
-  doc.fontSize(8).font('Helvetica').fillColor('#444')
-    .text(company?.address || '', M, doc.y + 2, { width: CW, align: 'center' })
-    .text(`Telp: ${company?.phone || '-'}  |  Email: ${company?.email || '-'}`, M, doc.y + 1, { width: CW, align: 'center' });
-  if (company?.website) doc.text(`Website: ${company.website}`, M, doc.y + 1, { width: CW, align: 'center' });
-
-  // Garis bawah kop
-  const kopBottom = doc.y + 8;
-  doc.rect(M, kopBottom, CW, 1.5).fillColor(GOLD).fill();
-  doc.rect(M, kopBottom + 3, CW, 4).fillColor(NAVY).fill();
+  const kopBottom = drawKopSurat(doc, company, logo);
 
   // ── JUDUL SURAT ────────────────────────────────────
   let y = kopBottom + 20;
@@ -133,58 +146,122 @@ const generateSphPdf = (sph, company, docName = 'Surat Penawaran Harga') => new 
     .text(openingText, col1, y, { width: CW, align: 'justify', lineGap: 2 });
   y = doc.y + 14;
 
-  // ── TABEL ITEM ────────────────────────────────────
-  const cols = { no: M, nama: M + 22, qty: M + 250, sat: M + 305, harga: M + 355, total: M + 440 };
-  const cw = { no: 22, nama: 228, qty: 55, sat: 50, harga: 85, total: CW - 440 };
+  // ── TABEL ITEM (multi-section aware) ─────────────────
   const rh = 18;
 
-  // Header tabel
-  doc.rect(M, y, CW, rh).fillColor(HEADER_COLOR).fill();
-  [['No', 'no', 'center'], ['Uraian / Deskripsi', 'nama', 'left'], ['Qty', 'qty', 'center'],
-    ['Sat.', 'sat', 'center'], ['Harga Satuan (Rp)', 'harga', 'right'], ['Jumlah (Rp)', 'total', 'right']
-  ].forEach(([h, k, align]) => {
-    doc.fontSize(8).font('Helvetica-Bold').fillColor('#fff')
-      .text(h, cols[k] + 3, y + 5, { width: cw[k] - 6, align });
-  });
-  y += rh;
+  // Build sections config
+  const sectionsConfig = (sph.sectionsConfig && Array.isArray(sph.sectionsConfig) && sph.sectionsConfig.length > 0)
+    ? sph.sectionsConfig
+    : [{ key: 'main', title: '', showPerColumn: false, totalOverride: null }];
+  const isMultiSection = sectionsConfig.length > 1 || !!(sectionsConfig[0] && sectionsConfig[0].title);
 
-  // Baris item
-  sph.items.forEach((item, i) => {
-    const bg = i % 2 === 0 ? '#f7f9fc' : '#ffffff';
-    doc.rect(M, y, CW, rh).fillColor(bg).fill();
-    doc.rect(M, y, CW, rh).strokeColor('#dde3ea').lineWidth(0.5).stroke();
+  let globalItemNo = 1;
 
-    doc.fontSize(8).font('Helvetica').fillColor('#222')
-      .text(String(i + 1), cols.no + 3, y + 5, { width: cw.no - 6, align: 'center' });
-    doc.fontSize(8).font('Helvetica-Bold').fillColor('#222')
-      .text(item.name, cols.nama + 3, y + 3, { width: cw.nama - 6 });
-    if (item.description) {
-      doc.fontSize(7).font('Helvetica').fillColor('#777')
-        .text(item.description, cols.nama + 3, doc.y, { width: cw.nama - 6 });
+  sectionsConfig.forEach((sec, sIdx) => {
+    const secItems = sph.items.filter(item => (item.sectionKey || 'main') === sec.key);
+    if (secItems.length === 0) return;
+    const showPer = sec.showPerColumn;
+
+    // Column layout — wider Nama when no Per column
+    const cols = showPer
+      ? { no: M, nama: M+22, qty: M+197, per: M+242, sat: M+282, harga: M+322, total: M+407 }
+      : { no: M, nama: M+22, qty: M+222, sat: M+272, harga: M+317, total: M+407 };
+    const cw = showPer
+      ? { no: 22, nama: 175, qty: 45, per: 40, sat: 40, harga: 85, total: CW-407 }
+      : { no: 22, nama: 200, qty: 50, sat: 45, harga: 90, total: CW-407 };
+
+    // Section title bar
+    if (sec.title) {
+      y += 4;
+      doc.rect(M, y, CW, 16).fillColor('#e8effa').fill();
+      doc.rect(M, y, 4, 16).fillColor(HEADER_COLOR).fill();
+      doc.fontSize(8.5).font('Helvetica-Bold').fillColor(HEADER_COLOR)
+        .text(sec.title, M + 8, y + 4, { width: CW - 12 });
+      y += 16;
     }
-    doc.fontSize(8).font('Helvetica').fillColor('#222')
-      .text(Number(item.quantity).toString(), cols.qty + 3, y + 5, { width: cw.qty - 6, align: 'center' })
-      .text(item.unit, cols.sat + 3, y + 5, { width: cw.sat - 6, align: 'center' })
-      .text(Number(item.price).toLocaleString('id-ID'), cols.harga + 3, y + 5, { width: cw.harga - 6, align: 'right' })
-      .text(Number(item.total).toLocaleString('id-ID'), cols.total + 3, y + 5, { width: cw.total - 6, align: 'right' });
+
+    // Table header
+    doc.rect(M, y, CW, rh).fillColor(HEADER_COLOR).fill();
+    const headers = [
+      ['No', 'no', 'center'],
+      ['Uraian / Deskripsi', 'nama', 'left'],
+      ['Qty', 'qty', 'center'],
+    ];
+    if (showPer) headers.push(['Per', 'per', 'center']);
+    headers.push(
+      ['Sat.', 'sat', 'center'],
+      ['Harga Satuan (Rp)', 'harga', 'right'],
+      ['Jumlah (Rp)', 'total', 'right']
+    );
+    headers.forEach(([h, k, align]) => {
+      doc.fontSize(8).font('Helvetica-Bold').fillColor('#fff')
+        .text(h, cols[k] + 3, y + 5, { width: cw[k] - 6, align });
+    });
     y += rh;
+
+    // Item rows
+    secItems.forEach((item, i) => {
+      const bg = i % 2 === 0 ? '#f7f9fc' : '#ffffff';
+      doc.rect(M, y, CW, rh).fillColor(bg).fill();
+      doc.rect(M, y, CW, rh).strokeColor('#dde3ea').lineWidth(0.5).stroke();
+
+      const nomor = item.nomor || String(globalItemNo);
+      globalItemNo++;
+
+      doc.fontSize(8).font('Helvetica').fillColor('#222')
+        .text(nomor, cols.no + 3, y + 5, { width: cw.no - 6, align: 'center' });
+      doc.fontSize(8).font('Helvetica-Bold').fillColor('#222')
+        .text(item.name, cols.nama + 3, y + 3, { width: cw.nama - 6 });
+      if (item.description) {
+        doc.fontSize(7).font('Helvetica').fillColor('#777')
+          .text(item.description, cols.nama + 3, doc.y, { width: cw.nama - 6 });
+      }
+      const priceStr = (item.price == null || Number(item.price) === 0) ? '' : Number(item.price).toLocaleString('id-ID');
+      const totalStr = (item.price == null || Number(item.price) === 0) ? '' : Number(item.total == null ? 0 : item.total).toLocaleString('id-ID');
+      doc.fontSize(8).font('Helvetica').fillColor('#222')
+        .text(Number(item.quantity).toString(), cols.qty + 3, y + 5, { width: cw.qty - 6, align: 'center' });
+      if (showPer) {
+        const perStr = item.perValue != null ? Number(item.perValue).toString() : '';
+        doc.text(perStr, cols.per + 3, y + 5, { width: cw.per - 6, align: 'center' });
+      }
+      doc.text(item.unit, cols.sat + 3, y + 5, { width: cw.sat - 6, align: 'center' })
+        .text(priceStr, cols.harga + 3, y + 5, { width: cw.harga - 6, align: 'right', lineBreak: false })
+        .text(totalStr, cols.total + 3, y + 5, { width: cw.total - 6, align: 'right', lineBreak: false });
+      y += rh;
+    });
+
+    // Section subtotal row (shown for all multi-section or titled sections)
+    if (isMultiSection) {
+      const secTotal = sec.totalOverride != null
+        ? Number(sec.totalOverride)
+        : secItems.reduce((s, item) => s + (item.total != null ? Number(item.total) : 0), 0);
+      doc.rect(M + CW - 250, y, 250, rh).fillColor(HEADER_COLOR).fill();
+      doc.rect(M, y, CW - 250, rh).fillColor('#eef2f7').fill();
+      doc.rect(M, y, CW - 250, rh).strokeColor('#dde3ea').lineWidth(0.5).stroke();
+      doc.rect(M + CW - 250, y, 250, rh).strokeColor('#dde3ea').lineWidth(0.5).stroke();
+      doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#fff')
+        .text(`Total ${sec.title || `Section ${sIdx + 1}`}`, M + CW - 245, y + 5, { width: 160, align: 'left' })
+        .text(`Rp ${secTotal.toLocaleString('id-ID')}`, M + CW - 85, y + 5, { width: 80, align: 'right', lineBreak: false });
+      y += rh;
+      y += 6;
+    }
   });
 
-  // Total rows
-  const totals = [['Subtotal', sph.subtotal]];
-  if (Number(sph.taxRate) > 0) totals.push([`PPN ${Number(sph.taxRate)}%`, sph.taxAmount]);
+  // Grand total rows
+  const totals = [];
+  if (Number(sph.subtotal) > 0) totals.push(['Subtotal', sph.subtotal]);
+  if (Number(sph.taxRate) > 0 && Number(sph.taxAmount) > 0) totals.push([`PPN ${Number(sph.taxRate)}%`, sph.taxAmount]);
   totals.push(['TOTAL', sph.total]);
 
   totals.forEach(([label, val], i) => {
     const isLast = i === totals.length - 1;
-    if (isLast) doc.rect(M + CW - 250, y, 250, rh).fillColor(HEADER_COLOR).fill();
-    else doc.rect(M + CW - 250, y, 250, rh).fillColor(isLast ? HEADER_COLOR : '#eef2f7').fill();
+    doc.rect(M + CW - 250, y, 250, rh).fillColor(isLast ? HEADER_COLOR : '#eef2f7').fill();
     doc.rect(M, y, CW - 250, rh).strokeColor('#dde3ea').lineWidth(0.5).stroke();
     doc.rect(M + CW - 250, y, 250, rh).strokeColor('#dde3ea').lineWidth(0.5).stroke();
     doc.fontSize(isLast ? 9 : 8).font(isLast ? 'Helvetica-Bold' : 'Helvetica')
       .fillColor(isLast ? '#fff' : '#333')
       .text(label, M + CW - 245, y + 5, { width: 160, align: 'left' })
-      .text(`Rp ${Number(val).toLocaleString('id-ID')}`, M + CW - 85, y + 5, { width: 80, align: 'right' });
+      .text(`Rp ${Number(val).toLocaleString('id-ID')}`, M + CW - 85, y + 5, { width: 80, align: 'right', lineBreak: false });
     y += rh;
   });
 
@@ -247,6 +324,23 @@ const generateSphPdf = (sph, company, docName = 'Surat Penawaran Harga') => new 
   doc.fontSize(8).font('Helvetica').fillColor('#555')
     .text(signerTitle, sigX, y, { width: 150, align: 'center' });
 
+  // ── LAMPIRAN LIST ─────────────────────────────────────
+  const lampiranList = sph.lampiran || [];
+  if (lampiranList.length > 0) {
+    y = doc.y + 20;
+    doc.rect(M, y, CW, 1).fillColor('#dde3ea').fill();
+    y += 8;
+    doc.fontSize(8.5).font('Helvetica-Bold').fillColor(NAVY).text('Lampiran:', M, y);
+    y = doc.y + 4;
+    lampiranList.forEach((dl, i) => {
+      const lmp = dl.lampiran || dl;
+      doc.fontSize(8).font('Helvetica').fillColor('#444')
+        .text(`${i + 1}. ${lmp.nama}${lmp.fileName ? ` (${lmp.fileName})` : ''}`, M + 10, y, { width: CW - 10 });
+      y = doc.y + 2;
+    });
+    y += 6;
+  }
+
   // Garis bawah halaman
   doc.rect(M, PAGE_H - M - 8, CW, 1.5).fillColor(GOLD).fill();
   doc.rect(M, PAGE_H - M - 4, CW, 4).fillColor(NAVY).fill();
@@ -270,61 +364,60 @@ const generateInvoicePdf = (invoice, company, docName = 'INVOICE') => new Promis
   const statusLabel = { UNPAID: 'BELUM DIBAYAR', PARTIAL: 'DIBAYAR SEBAGIAN', PAID: 'LUNAS', OVERDUE: 'JATUH TEMPO' };
   const statusColor = { UNPAID: '#dc2626', PARTIAL: '#d97706', PAID: '#16a34a', OVERDUE: '#dc2626' };
 
-  // ── HEADER INVOICE ────────────────────────────────
-  let headerY = M;
-  if (logo) {
-    try { doc.image(logo, M, headerY, { height: 50, fit: [80, 50] }); headerY += 4; } catch (e) {}
-  }
-  doc.fontSize(15).font('Helvetica-Bold').fillColor(TEAL_DARK)
-    .text(company?.name || 'PT. NAMA PERUSAHAAN', M, headerY + (logo ? 56 : 0));
-  doc.fontSize(8).font('Helvetica').fillColor('#555')
-    .text(company?.address || '', M, doc.y + 2, { width: 240 })
-    .text(`Telp: ${company?.phone || '-'}`, M, doc.y + 1, { width: 240 })
-    .text(`Email: ${company?.email || '-'}`, M, doc.y + 1, { width: 240 });
-  if (company?.taxNumber) doc.text(`NPWP: ${company.taxNumber}`, M, doc.y + 1, { width: 240 });
+  // ── KOP SURAT ─────────────────────────────────────
+  const kopBottom = drawKopSurat(doc, company, logo);
 
-  // Blok kanan — INVOICE title + nomor
-  const rightX = PAGE_W - M - 200;
-  doc.fontSize(32).font('Helvetica-Bold').fillColor(TEAL)
-    .text(docName.toUpperCase(), rightX, M, { width: 200, align: 'right' });
+  // ── JUDUL & STATUS ────────────────────────────────
+  let y = kopBottom + 16;
+  doc.fontSize(15).font('Helvetica-Bold').fillColor(INV_HEADER_COLOR)
+    .text(docName.toUpperCase(), M, y, { width: CW, align: 'center', underline: true });
+  y = doc.y + 6;
 
-  // Status badge
   const sc = statusColor[invoice.status] || '#666';
   const sl = statusLabel[invoice.status] || invoice.status;
-  doc.rect(rightX + 200 - 120, doc.y + 4, 120, 18).fillColor(sc).fill();
+  const badgeW = 130;
+  doc.rect(M + (CW - badgeW) / 2, y, badgeW, 16).fillColor(sc).fill();
   doc.fontSize(8).font('Helvetica-Bold').fillColor('#fff')
-    .text(sl, rightX + 200 - 120, doc.y + 8, { width: 120, align: 'center' });
+    .text(sl, M + (CW - badgeW) / 2, y + 4, { width: badgeW, align: 'center' });
+  y += 26;
 
-  const infoY = doc.y + 14;
-  const infoPairs = [
+  // ── INFO 2 KOLOM: kiri=dokumen, kanan=klien ───────
+  const col1 = M, col2 = M + CW / 2 + 10;
+  const colW = CW / 2 - 20;
+  const lineH = 14;
+
+  const docInfoRows = [
     ['No. Invoice', invoice.number],
     ['Tanggal', formatDate(invoice.date)],
-    ['Jatuh Tempo', formatDate(invoice.dueDate)],
+    ['Jatuh Tempo', invoice.dueDate ? formatDate(invoice.dueDate) : '-'],
   ];
-  let iy = infoY;
-  infoPairs.forEach(([k, v]) => {
-    doc.fontSize(8).font('Helvetica').fillColor('#555').text(k, rightX, iy, { width: 85 });
-    doc.fontSize(8).font('Helvetica').fillColor('#555').text(':', rightX + 85, iy, { width: 10 });
-    doc.fontSize(8).font('Helvetica-Bold').fillColor('#111').text(v, rightX + 95, iy, { width: 105, align: 'right' });
-    iy += 14;
+  let ly = y;
+  docInfoRows.forEach(([k, v]) => {
+    doc.fontSize(9).font('Helvetica').fillColor('#444')
+      .text(k, col1, ly, { width: 85 })
+      .text(':', col1 + 85, ly, { width: 10 })
+      .text(v, col1 + 95, ly, { width: colW - 95 });
+    ly += lineH;
   });
 
-  // ── DIVIDER ───────────────────────────────────────
-  let y = Math.max(doc.y, iy) + 10;
-  doc.rect(M, y, CW, 3).fillColor(TEAL).fill();
+  let ry = y;
+  doc.fontSize(9).font('Helvetica').fillColor('#555').text('Kepada Yth.', col2, ry);
+  ry = doc.y + 2;
+  doc.fontSize(9).font('Helvetica-Bold').fillColor(TEAL_DARK)
+    .text(invoice.client.name, col2, ry, { width: colW });
+  ry = doc.y + 1;
+  if (invoice.client.address) {
+    doc.fontSize(9).font('Helvetica').fillColor('#555')
+      .text(invoice.client.address, col2, ry, { width: colW });
+    ry = doc.y + 1;
+  }
+  if (invoice.client.email) { doc.fontSize(9).font('Helvetica').fillColor('#555').text(invoice.client.email, col2, ry, { width: colW }); ry = doc.y + 1; }
+  if (invoice.client.phone) { doc.text(invoice.client.phone, col2, ry, { width: colW }); ry = doc.y + 1; }
+  if (invoice.client.pic) { doc.text(`UP: ${invoice.client.pic}`, col2, ry, { width: colW }); }
+
+  y = Math.max(ly, doc.y) + 10;
+  doc.rect(M, y, CW, 2).fillColor(INV_HEADER_COLOR).fill();
   y += 10;
-
-  // ── TAGIHAN KEPADA ────────────────────────────────
-  doc.rect(M, y, 260, 80).fillColor(TEAL_LIGHT).fill();
-  doc.rect(M, y, 3, 80).fillColor(TEAL).fill();
-  doc.fontSize(7.5).font('Helvetica').fillColor(TEAL).text('TAGIHAN KEPADA:', M + 10, y + 8, { characterSpacing: 0.5 });
-  doc.fontSize(11).font('Helvetica-Bold').fillColor(TEAL_DARK).text(invoice.client.name, M + 10, doc.y + 3, { width: 240 });
-  doc.fontSize(8).font('Helvetica').fillColor('#555').text(invoice.client.address, M + 10, doc.y + 2, { width: 240 });
-  if (invoice.client.email) doc.text(invoice.client.email, M + 10, doc.y + 1, { width: 240 });
-  if (invoice.client.phone) doc.text(invoice.client.phone, M + 10, doc.y + 1, { width: 240 });
-  if (invoice.client.pic) doc.text(`UP: ${invoice.client.pic}`, M + 10, doc.y + 1, { width: 240 });
-
-  y += 90;
 
   // ── TABEL ITEM ────────────────────────────────────
   const cols = { no: M, desc: M + 22, qty: M + 237, sat: M + 285, price: M + 330, total: M + 413 };
@@ -468,23 +561,8 @@ const generateExpensePdf = (expenses, company, filters, signaturesData = [null, 
   const noBukti = `${prefix}/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
 
   // ── KOP ────────────────────────────────────────────
-  doc.rect(M, M, CW, 4).fillColor(NAVY).fill();
-  doc.rect(M, M + 6, CW, 1.5).fillColor(GOLD).fill();
-
   const logo = getLogoBuffer(company);
-  let headerY = M + 16;
-  if (logo) {
-    try { doc.image(logo, M, headerY, { height: 50, fit: [75, 50] }); } catch (e) {}
-  }
-  doc.fontSize(15).font('Helvetica-Bold').fillColor(NAVY)
-    .text(company?.name || 'PT. NAMA PERUSAHAAN', M, headerY + 2, { width: CW, align: 'center' });
-  doc.fontSize(8).font('Helvetica').fillColor('#444')
-    .text(company?.address || '', M, doc.y + 2, { width: CW, align: 'center' })
-    .text(`Telp: ${company?.phone || '-'}  |  Email: ${company?.email || '-'}`, M, doc.y + 1, { width: CW, align: 'center' });
-
-  const kopBottom = doc.y + 8;
-  doc.rect(M, kopBottom, CW, 1.5).fillColor(GOLD).fill();
-  doc.rect(M, kopBottom + 3, CW, 4).fillColor(NAVY).fill();
+  const kopBottom = drawKopSurat(doc, company, logo);
 
   // ── JUDUL ─────────────────────────────────────────
   let y = kopBottom + 16;
@@ -637,23 +715,7 @@ const generateRfpPdf = (rfp, company, signaturesData = [null, null, null, null])
   const logo = getLogoBuffer(company);
 
   // ── KOP SURAT ──────────────────────────────────────
-  doc.rect(M, M, CW, 4).fillColor(NAVY).fill();
-  doc.rect(M, M + 6, CW, 1.5).fillColor(GOLD).fill();
-
-  let headerY = M + 18;
-  if (logo) {
-    try { doc.image(logo, M, headerY, { height: 50, fit: [75, 50] }); } catch (e) {}
-  }
-
-  doc.fontSize(15).font('Helvetica-Bold').fillColor(NAVY)
-    .text(company?.name || 'PT. NAMA PERUSAHAAN', M, headerY + 2, { width: CW, align: 'center' });
-  doc.fontSize(8).font('Helvetica').fillColor('#444')
-    .text(company?.address || '', M, doc.y + 2, { width: CW, align: 'center' })
-    .text(`Telp: ${company?.phone || '-'}  |  Email: ${company?.email || '-'}`, M, doc.y + 1, { width: CW, align: 'center' });
-
-  const kopBottom = doc.y + 8;
-  doc.rect(M, kopBottom, CW, 1.5).fillColor(GOLD).fill();
-  doc.rect(M, kopBottom + 3, CW, 4).fillColor(NAVY).fill();
+  const kopBottom = drawKopSurat(doc, company, logo);
 
   // ── JUDUL ──────────────────────────────────────────
   let y = kopBottom + 16;

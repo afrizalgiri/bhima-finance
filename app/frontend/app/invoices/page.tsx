@@ -11,7 +11,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { toast } from '../../components/ui/toaster';
 import { formatCurrency, formatDate, formatDateInput, INVOICE_STATUS, PAYMENT_METHODS } from '../../lib/utils';
-import { Plus, Download, Eye, Trash2, X, CreditCard } from 'lucide-react';
+import { Plus, Download, Eye, Trash2, X, CreditCard, Pencil } from 'lucide-react';
 
 interface Item { name: string; description: string; quantity: number; unit: string; price: number; productId?: string; }
 const emptyItem: Item = { name: '', description: '', quantity: 1, unit: 'pcs', price: 0 };
@@ -35,8 +35,13 @@ export default function InvoicesPage() {
     notes: '',
     headerColor: '#0f766e',
     signatureId: '',
+    status: 'UNPAID',
+    number: '',
   });
   const [items, setItems] = useState<Item[]>([{ ...emptyItem }]);
+  const [editMode, setEditMode] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingNumber, setEditingNumber] = useState('');
   const [saving, setSaving] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [paymentForm, setPaymentForm] = useState({
@@ -86,15 +91,49 @@ export default function InvoicesPage() {
   const taxAmount = subtotal * (parseFloat(form.taxRate) / 100);
   const total = subtotal + taxAmount;
 
+  const openEdit = async (inv: any) => {
+    const r = await api.get(`/invoices/${inv.id}`);
+    const s = r.data.data;
+    setEditMode(true);
+    setEditingId(s.id);
+    setEditingNumber(s.number);
+    setForm({
+      clientId: s.clientId,
+      date: new Date(s.date).toISOString().split('T')[0],
+      dueDate: s.dueDate ? new Date(s.dueDate).toISOString().split('T')[0] : '',
+      taxRate: String(s.taxRate || 0),
+      notes: s.notes || '',
+      headerColor: s.headerColor || '#0f766e',
+      signatureId: s.signatureId || '',
+      status: s.status || 'UNPAID',
+      number: s.number || '',
+    });
+    setItems(s.items.map((item: any) => ({
+      name: item.name,
+      description: item.description || '',
+      quantity: Number(item.quantity),
+      unit: item.unit || 'pcs',
+      price: Number(item.price),
+      productId: item.productId || undefined,
+    })));
+    setDialogOpen(true);
+  };
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true);
     try {
-      await api.post('/invoices', {
+      const payload = {
         ...form, taxRate: parseFloat(form.taxRate), items,
         headerColor: form.headerColor || null,
         signatureId: form.signatureId || null,
-      });
-      toast({ title: 'Invoice berhasil dibuat' });
+      };
+      if (editMode && editingId) {
+        await api.put(`/invoices/${editingId}`, payload);
+        toast({ title: 'Invoice berhasil diupdate' });
+      } else {
+        await api.post('/invoices', payload);
+        toast({ title: 'Invoice berhasil dibuat' });
+      }
       setDialogOpen(false); fetchAll();
     } catch (err: any) {
       toast({ title: 'Gagal', description: err.response?.data?.message, variant: 'destructive' });
@@ -156,8 +195,11 @@ export default function InvoicesPage() {
   };
 
   const openCreate = () => {
+    setEditMode(false);
+    setEditingId(null);
+    setEditingNumber('');
     setItems([{ ...emptyItem }]);
-    setForm({ clientId: '', date: new Date().toISOString().split('T')[0], dueDate: '', taxRate: '0', notes: '', headerColor: '#0f766e', signatureId: '' });
+    setForm({ clientId: '', date: new Date().toISOString().split('T')[0], dueDate: '', taxRate: '0', notes: '', headerColor: '#0f766e', signatureId: '', status: 'UNPAID', number: '' });
     setDialogOpen(true);
   };
 
@@ -205,6 +247,7 @@ export default function InvoicesPage() {
                       <td className="py-2.5 px-3">
                         <div className="flex gap-1">
                           <Button variant="ghost" size="icon" onClick={() => viewInvoice(inv.id)} title="Lihat detail"><Eye size={15} /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(inv)} title="Edit Invoice"><Pencil size={15} /></Button>
                           <Button variant="ghost" size="icon" onClick={() => downloadPdf(inv.id, inv.number)} disabled={downloadingId === inv.id} title="Download PDF"><Download size={15} /></Button>
                           {isUnpaid && (
                             <Button variant="ghost" size="icon" onClick={() => openPayment(inv)} className="text-green-600 hover:text-green-800" title="Catat pembayaran"><CreditCard size={15} /></Button>
@@ -224,16 +267,25 @@ export default function InvoicesPage() {
       {/* Create Invoice Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh]">
-          <DialogHeader><DialogTitle>Buat Invoice Baru</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editMode ? `Edit Invoice — ${editingNumber}` : 'Buat Invoice Baru'}</DialogTitle></DialogHeader>
           <form onSubmit={save} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
+              <div className={editMode ? 'col-span-1' : 'col-span-2'}>
                 <Label>Klien *</Label>
                 <Select value={form.clientId} onChange={e => setForm({...form, clientId: e.target.value})} required className="mt-1">
                   <option value="">-- Pilih Klien --</option>
                   {clients.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Select>
               </div>
+              {editMode && (
+                <div>
+                  <Label>Status</Label>
+                  <Select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="mt-1">
+                    {INVOICE_STATUS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </Select>
+                </div>
+              )}
+
               <div><Label>Tanggal *</Label><Input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} required className="mt-1" /></div>
               <div><Label>Jatuh Tempo</Label><Input type="date" value={form.dueDate} onChange={e => setForm({...form, dueDate: e.target.value})} className="mt-1" /></div>
             </div>
@@ -313,7 +365,9 @@ export default function InvoicesPage() {
             <div><Label>Catatan</Label><textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows={2} className="mt-1 w-full rounded-md border border-input px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" /></div>
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="flex-1">Batal</Button>
-              <Button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700">{saving ? 'Membuat...' : 'Buat Invoice'}</Button>
+              <Button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700">
+                {saving ? (editMode ? 'Menyimpan...' : 'Membuat...') : (editMode ? 'Simpan Perubahan' : 'Buat Invoice')}
+              </Button>
             </div>
           </form>
         </DialogContent>

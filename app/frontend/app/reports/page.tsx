@@ -13,14 +13,19 @@ export default function ReportsPage() {
   const [tab, setTab] = useState<Tab>('cashflow');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const now = new Date();
   const [filters, setFilters] = useState({ month: String(now.getMonth() + 1), year: String(now.getFullYear()) });
 
   const fetchReport = async () => {
     setLoading(true);
+    setError(null);
+    setData(null);
     try {
       const r = await api.get(`/reports/${tab}`, { params: filters });
       setData(r.data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Gagal memuat laporan. Coba lagi.');
     } finally { setLoading(false); }
   };
 
@@ -58,6 +63,8 @@ export default function ReportsPage() {
 
       {loading ? (
         <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
+      ) : error ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
       ) : (
         <>
           {tab === 'cashflow' && data && (
