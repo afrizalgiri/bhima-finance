@@ -9,5 +9,7 @@ router.get('/invoices', ctrl.invoiceReport);
 router.get('/payments', ctrl.paymentReport);
 router.get('/expenses', ctrl.expenseReport);
 router.get('/cashflow', ctrl.cashflowReport);
+router.get('/rfp', ctrl.rfpReport);
+router.get('/export', ctrl.excelExport);
 
 module.exports = router;
