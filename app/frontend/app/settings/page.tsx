@@ -16,6 +16,7 @@ export default function SettingsPage() {
     docNameSph: '', docPrefixSph: '',
     docNameInvoice: '', docPrefixInvoice: '',
     docNameExpense: '', docPrefixExpense: '',
+    docNamePo: '', docPrefixPo: '',
   });
   const [logoUrl, setLogoUrl] = useState('');
   const [saving, setSaving] = useState(false);
@@ -36,6 +37,7 @@ export default function SettingsPage() {
           docNameSph: d.docNameSph || '', docPrefixSph: d.docPrefixSph || '',
           docNameInvoice: d.docNameInvoice || '', docPrefixInvoice: d.docPrefixInvoice || '',
           docNameExpense: d.docNameExpense || '', docPrefixExpense: d.docPrefixExpense || '',
+          docNamePo: d.docNamePo || '', docPrefixPo: d.docPrefixPo || '',
         });
         setLogoUrl(d.logoUrl || '');
       }
@@ -202,6 +204,21 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <p className="text-xs text-gray-400">Contoh nomor: <span className="font-mono">{form.docPrefixExpense || 'BKK'}/2026/03/15</span></p>
+              </div>
+
+              <div className="p-3 border border-gray-200 rounded-lg space-y-3">
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Purchase Order (PO)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Nama Dokumen</Label>
+                    <Input value={form.docNamePo} onChange={e => setForm({...form, docNamePo: e.target.value})} placeholder="Purchase Order" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Kode Prefix</Label>
+                    <Input value={form.docPrefixPo} onChange={e => setForm({...form, docPrefixPo: e.target.value})} placeholder="PO" className="mt-1" />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400">Contoh nomor: <span className="font-mono">{form.docPrefixPo || 'PO'}/2026/03/0001</span></p>
               </div>
             </div>
           </CardContent>

@@ -939,4 +939,190 @@ const generateRfpPdf = (rfp, company, signaturesData = [null, null, null, null],
   doc.end();
 });
 
-module.exports = { generateSphPdf, generateInvoicePdf, generateExpensePdf, generateRfpPdf };
+// ─── PURCHASE ORDER PDF ───────────────────────────────────────────────────────
+const generatePoPdf = (po, company, signaturesData = [null, null]) => new Promise((resolve, reject) => {
+  const doc = buildPdf((err, buf) => err ? reject(err) : resolve(buf));
+  const NAVY = '#1a3557';
+  const GOLD = '#c9a84c';
+  const LIGHT = '#f0f4f8';
+
+  const logo = getLogoBuffer(company);
+  const kopBottom = drawKopSurat(doc, company, logo);
+
+  let y = kopBottom + 18;
+
+  // ── Title ──────────────────────────────────────────────────────────────────
+  const docTitle = (company?.docNamePo || 'PURCHASE ORDER').toUpperCase();
+  doc.rect(M, y, CW, 26).fillColor(NAVY).fill();
+  doc.fontSize(13).font('Helvetica-Bold').fillColor('#fff')
+    .text(docTitle, M, y + 7, { width: CW, align: 'center' });
+  y += 34;
+
+  // ── Info block ──────────────────────────────────────────────────────────────
+  const halfW = (CW - 10) / 2;
+
+  // Left: PO info
+  const infoY = y;
+  doc.rect(M, infoY, halfW, 90).fillColor(LIGHT).fill();
+  doc.rect(M, infoY, halfW, 90).strokeColor('#d0d8e4').lineWidth(0.5).stroke();
+  let ly = infoY + 8;
+  const kvRow = (label, value, yy) => {
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#555').text(label, M + 8, yy, { width: 68 });
+    doc.fontSize(8).font('Helvetica').fillColor('#1a1a1a').text(value || '-', M + 78, yy, { width: halfW - 86 });
+    return yy + 12;
+  };
+  ly = kvRow('No. PO', po.number, ly);
+  ly = kvRow('Tanggal', formatDate(po.date), ly);
+  if (po.dueDate) ly = kvRow('Tgl. Kirim', formatDate(po.dueDate), ly);
+  if (po.project) ly = kvRow('Proyek', po.project, ly);
+
+  // Right: Supplier info
+  const rx = M + halfW + 10;
+  doc.rect(rx, infoY, halfW, 90).fillColor(LIGHT).fill();
+  doc.rect(rx, infoY, halfW, 90).strokeColor('#d0d8e4').lineWidth(0.5).stroke();
+  doc.rect(rx, infoY, halfW, 14).fillColor(NAVY).fill();
+  doc.fontSize(8).font('Helvetica-Bold').fillColor('#fff').text('SUPPLIER', rx + 8, infoY + 3, { width: halfW - 16 });
+  let ry = infoY + 18;
+  const sRow = (val, bold = false) => {
+    if (!val) return;
+    doc.fontSize(bold ? 9 : 7.5).font(bold ? 'Helvetica-Bold' : 'Helvetica').fillColor('#1a1a1a')
+      .text(val, rx + 8, ry, { width: halfW - 16 });
+    ry += bold ? 13 : 11;
+  };
+  sRow(po.supplier, true);
+  if (po.supplierAddress) sRow(po.supplierAddress);
+  if (po.supplierPhone) sRow(`Tel: ${po.supplierPhone}`);
+  if (po.supplierEmail) sRow(`Email: ${po.supplierEmail}`);
+  if (po.attention) sRow(`U.p. ${po.attention}`);
+
+  y = infoY + 98;
+
+  // ── Description ─────────────────────────────────────────────────────────────
+  if (po.description) {
+    doc.fontSize(8.5).font('Helvetica').fillColor('#333')
+      .text(po.description, M, y, { width: CW });
+    y = doc.y + 8;
+  }
+
+  // ── Items table ─────────────────────────────────────────────────────────────
+  const colNo = 22, colName = 180, colQty = 44, colUnit = 38, colPrice = 80, colTotal = 80;
+  const colX = { no: M, name: M + colNo, qty: M + colNo + colName, unit: M + colNo + colName + colQty, price: M + colNo + colName + colQty + colUnit, total: M + colNo + colName + colQty + colUnit + colPrice };
+
+  // Header row
+  doc.rect(M, y, CW, 18).fillColor(NAVY).fill();
+  const th = (text, x, w, align = 'left') => doc.fontSize(8).font('Helvetica-Bold').fillColor('#fff')
+    .text(text, x + 2, y + 5, { width: w - 4, align });
+  th('No', colX.no, colNo, 'center');
+  th('Nama / Deskripsi', colX.name, colName);
+  th('Qty', colX.qty, colQty, 'center');
+  th('Sat', colX.unit, colUnit, 'center');
+  th('Harga Satuan', colX.price, colPrice, 'right');
+  th('Jumlah', colX.total, colTotal, 'right');
+  y += 18;
+
+  // Items
+  po.items.forEach((item, idx) => {
+    const rowH = item.description ? 26 : 16;
+    if (y + rowH > PAGE_H - 100) {
+      doc.addPage();
+      y = M;
+    }
+    doc.rect(M, y, CW, rowH).fillColor(idx % 2 === 0 ? '#fff' : LIGHT).fill();
+    doc.rect(M, y, CW, rowH).strokeColor('#e2e8f0').lineWidth(0.3).stroke();
+
+    const cy = y + (item.description ? 5 : 4);
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#1a1a1a').text(String(idx + 1), colX.no + 2, cy, { width: colNo - 4, align: 'center' });
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#1a1a1a').text(item.name, colX.name + 2, cy, { width: colName - 4 });
+    if (item.description) {
+      doc.fontSize(7).font('Helvetica').fillColor('#666').text(item.description, colX.name + 2, cy + 11, { width: colName - 4 });
+    }
+    doc.fontSize(8).font('Helvetica').fillColor('#1a1a1a')
+      .text(String(item.quantity), colX.qty + 2, cy, { width: colQty - 4, align: 'center' })
+      .text(item.unit, colX.unit + 2, cy, { width: colUnit - 4, align: 'center' })
+      .text(formatCurrency(item.price), colX.price + 2, cy, { width: colPrice - 4, align: 'right' })
+      .text(formatCurrency(item.total), colX.total + 2, cy, { width: colTotal - 4, align: 'right' });
+    y += rowH;
+  });
+
+  // Totals
+  doc.rect(M, y, CW, 0.5).fillColor('#d0d8e4').fill();
+  y += 6;
+  const txW = 90, txX = M + CW - txW;
+  const totRow = (label, value, bold = false, navy = false) => {
+    if (y + 14 > PAGE_H - 80) { doc.addPage(); y = M; }
+    if (navy) doc.rect(M, y, CW, 16).fillColor(NAVY).fill();
+    doc.fontSize(bold ? 9 : 8).font(bold ? 'Helvetica-Bold' : 'Helvetica')
+      .fillColor(navy ? '#fff' : (bold ? NAVY : '#444'))
+      .text(label, M + CW - txW - 110, y + 3, { width: 106, align: 'right' });
+    doc.fontSize(bold ? 9 : 8).font(bold ? 'Helvetica-Bold' : 'Helvetica')
+      .fillColor(navy ? '#fff' : (bold ? NAVY : '#444'))
+      .text(value, txX, y + 3, { width: txW - 4, align: 'right' });
+    y += 16;
+  };
+
+  totRow('Subtotal', formatCurrency(po.subtotal));
+  if (Number(po.taxRate) > 0) totRow(`PPN (${po.taxRate}%)`, formatCurrency(po.taxAmount));
+  totRow('TOTAL', formatCurrency(po.total), true, true);
+
+  y += 10;
+
+  // Notes / Payment terms
+  if (po.notes || po.paymentTerms) {
+    if (y + 60 > PAGE_H - 120) { doc.addPage(); y = M; }
+    if (po.notes) {
+      doc.fontSize(8).font('Helvetica-Bold').fillColor(NAVY).text('Catatan:', M, y);
+      y = doc.y + 2;
+      doc.fontSize(8).font('Helvetica').fillColor('#333').text(po.notes, M, y, { width: CW });
+      y = doc.y + 8;
+    }
+    if (po.paymentTerms) {
+      doc.fontSize(8).font('Helvetica-Bold').fillColor(NAVY).text('Syarat Pembayaran:', M, y);
+      y = doc.y + 2;
+      doc.fontSize(8).font('Helvetica').fillColor('#333').text(po.paymentTerms, M, y, { width: CW });
+      y = doc.y + 8;
+    }
+  }
+
+  // ── Signature blocks ────────────────────────────────────────────────────────
+  if (y + 100 > PAGE_H - 40) { doc.addPage(); y = M; }
+  y = Math.max(y, PAGE_H - 150);
+
+  const sigLabels = ['Dibuat Oleh', 'Disetujui Oleh'];
+  const sigW = (CW - 20) / 2;
+  sigLabels.forEach((label, i) => {
+    const sx = M + i * (sigW + 20);
+    doc.rect(sx, y, sigW, 80).fillColor(LIGHT).fill();
+    doc.rect(sx, y, sigW, 80).strokeColor('#d0d8e4').lineWidth(0.5).stroke();
+    doc.rect(sx, y, sigW, 14).fillColor(NAVY).fill();
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#fff')
+      .text(label, sx + 4, y + 3, { width: sigW - 8, align: 'center' });
+
+    const sig = signaturesData[i];
+    if (sig) {
+      const imgPath = getSignatureImagePath(sig);
+      if (imgPath) {
+        try { doc.image(imgPath, sx + (sigW / 2) - 25, y + 18, { fit: [50, 30], align: 'center' }); } catch (e) {}
+      }
+      doc.rect(sx + 8, y + 52, sigW - 16, 0.5).fillColor('#ccc').fill();
+      doc.fontSize(8).font('Helvetica-Bold').fillColor(NAVY)
+        .text(sig.name, sx + 4, y + 56, { width: sigW - 8, align: 'center' });
+      if (sig.title) doc.fontSize(7).font('Helvetica').fillColor('#666')
+        .text(sig.title, sx + 4, doc.y + 1, { width: sigW - 8, align: 'center' });
+    } else {
+      doc.rect(sx + 8, y + 52, sigW - 16, 0.5).fillColor('#ccc').fill();
+      doc.fontSize(7.5).font('Helvetica').fillColor('#aaa')
+        .text('(tanda tangan)', sx + 4, y + 56, { width: sigW - 8, align: 'center' });
+    }
+  });
+
+  // Footer bar
+  const footerY = PAGE_H - M - 8;
+  doc.rect(M, footerY - 6, CW, 2).fillColor(GOLD).fill();
+  doc.rect(M, footerY - 2, CW, 4).fillColor(NAVY).fill();
+  doc.fontSize(7).font('Helvetica').fillColor('#aaa')
+    .text(`Dokumen ini dicetak secara otomatis oleh sistem Bhima Finance`, M, footerY + 4, { width: CW, align: 'center' });
+
+  doc.end();
+});
+
+module.exports = { generateSphPdf, generateInvoicePdf, generateExpensePdf, generateRfpPdf, generatePoPdf };

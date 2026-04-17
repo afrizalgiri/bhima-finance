@@ -86,6 +86,8 @@ model CompanySetting {
   docPrefixInvoice String?
   docNameExpense   String?
   docPrefixExpense String?
+  docNamePo        String?
+  docPrefixPo      String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -320,6 +322,51 @@ model FormToken {
   createdAt   DateTime  @default(now())
 
   @@map("form_tokens")
+}
+
+// ─── PURCHASE ORDER ──────────────────────────────────────
+model Po {
+  id              String   @id @default(uuid())
+  number          String   @unique
+  date            DateTime
+  dueDate         DateTime?
+  supplier        String
+  supplierAddress String?
+  supplierPhone   String?
+  supplierEmail   String?
+  attention       String?
+  project         String?
+  description     String?
+  items           PoItem[]
+  subtotal        Float    @default(0)
+  taxRate         Float    @default(0)
+  taxAmount       Float    @default(0)
+  total           Float    @default(0)
+  notes           String?
+  paymentTerms    String?
+  status          String   @default("DRAFT")
+  headerColor     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("pos")
+}
+
+model PoItem {
+  id          String   @id @default(uuid())
+  poId        String
+  po          Po       @relation(fields: [poId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  quantity    Float    @default(1)
+  unit        String   @default("pcs")
+  price       Float    @default(0)
+  total       Float    @default(0)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("po_items")
 }
 
 // ─── LAMPIRAN ────────────────────────────────────────────

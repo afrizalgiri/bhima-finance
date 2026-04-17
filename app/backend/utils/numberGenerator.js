@@ -47,4 +47,19 @@ const generateRfpNumber = async (prefix = 'RFP') => {
   return `${prefix}/${year}/${month}/${pad(count + 1)}`;
 };
 
-module.exports = { generateSphNumber, generateInvoiceNumber, generateRfpNumber };
+const generatePoNumber = async (prefix = 'PO') => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = pad(now.getMonth() + 1, 2);
+  const count = await prisma.po.count({
+    where: {
+      createdAt: {
+        gte: new Date(now.getFullYear(), now.getMonth(), 1),
+        lt: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+      },
+    },
+  });
+  return `${prefix}/${year}/${month}/${pad(count + 1)}`;
+};
+
+module.exports = { generateSphNumber, generateInvoiceNumber, generateRfpNumber, generatePoNumber };
