@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import api from '../../lib/api';
 import {
   Search, Eye, Trash2, Download, RefreshCw, Copy, Plus,
-  CheckCircle2, Clock, Link2, ChevronDown, ChevronUp,
+  CheckCircle2, Clock, Link2, ChevronDown, ChevronUp, Paperclip, X as XIcon,
 } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -37,6 +37,7 @@ interface Rfp {
   name: string; email?: string; beneficiary?: string; bankNorek?: string;
   rfpCategory: string; status: string; notes?: string;
   items: RfpItem[]; createdAt: string;
+  attachments?: { id: string; fileName: string; fileUrl: string; mimeType: string; fileSize?: number }[];
 }
 interface Signature { id: string; name: string; title?: string; imageUrl: string; }
 interface FormToken { id: string; token: string; label: string | null; usedAt: string | null; createdAt: string; }
@@ -81,6 +82,8 @@ export default function ExpenseRequestsPage() {
     notes: '',
   });
   const [staffItems, setStaffItems] = useState([{ description: '', amount: '' }]);
+  const [staffAttachments, setStaffAttachments] = useState<Array<{fileName:string;fileUrl:string;mimeType:string;fileSize:number}>>([]);
+  const [staffUploading, setStaffUploading] = useState(false);
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://bhima.sbs';
 
@@ -119,6 +122,29 @@ export default function ExpenseRequestsPage() {
     finally { setMyRfpsLoading(false); }
   }, []);
 
+  const handleStaffFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setStaffUploading(true);
+    try {
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await api.post('/expense-requests/upload-attachment', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        if (res.data.success) {
+          setStaffAttachments(prev => [...prev, res.data.data]);
+        }
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Gagal upload file');
+    } finally {
+      setStaffUploading(false);
+      e.target.value = '';
+    }
+  };
+
   const handleStaffSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const validItems = staffItems.filter(i => i.description && Number(i.amount) > 0);
@@ -131,10 +157,12 @@ export default function ExpenseRequestsPage() {
       const res = await api.post('/expense-requests/my-submit', {
         ...staffForm,
         items: validItems.map(i => ({ description: i.description, amount: Number(i.amount) })),
+        attachments: staffAttachments,
       });
       if (res.data.success) {
         setStaffForm({ date: new Date().toISOString().split('T')[0], dueDate: '', detailsOfPayment: '', project: '', description: '', beneficiary: '', bankNorek: '', rfpCategory: 'OTHERS', notes: '' });
         setStaffItems([{ description: '', amount: '' }]);
+        setStaffAttachments([]);
         setStaffTab('history');
         fetchMyRfps();
         alert(`Request berhasil dikirim! Nomor: ${res.data.data.number}`);
@@ -343,7 +371,36 @@ export default function ExpenseRequestsPage() {
                 className="w-full px-3 py-2 text-sm border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
 
-            <button type="submit" disabled={staffSubmitting}
+            {/* Lampiran */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-gray-600 uppercase flex items-center gap-1"><Paperclip size={12} />Lampiran Dokumen</label>
+                <label className={`text-xs text-blue-600 hover:text-blue-700 font-medium cursor-pointer ${staffUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                  {staffUploading ? 'Mengupload...' : '+ Tambah File'}
+                  <input type="file" multiple accept="image/*,.pdf" className="hidden" onChange={handleStaffFileChange} disabled={staffUploading} />
+                </label>
+              </div>
+              {staffAttachments.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">Belum ada lampiran (opsional)</p>
+              ) : (
+                <div className="space-y-1">
+                  {staffAttachments.map((att, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-gray-50 border rounded-lg px-3 py-2 text-xs">
+                      {att.mimeType.startsWith('image/') ? (
+                        <img src={`${API_BASE}${att.fileUrl}`} alt={att.fileName} className="w-8 h-8 object-cover rounded" />
+                      ) : (
+                        <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center text-red-600 font-bold text-xs">PDF</div>
+                      )}
+                      <span className="flex-1 truncate text-gray-700">{att.fileName}</span>
+                      <button type="button" onClick={() => setStaffAttachments(prev => prev.filter((_, i) => i !== idx))}
+                        className="text-gray-400 hover:text-red-500"><XIcon size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button type="submit" disabled={staffSubmitting || staffUploading}
               className="w-full py-3 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
               {staffSubmitting ? 'Mengirim...' : 'Kirim Request for Payment'}
             </button>
@@ -705,6 +762,30 @@ export default function ExpenseRequestsPage() {
                   )}
                 </div>
               </div>
+
+              {/* Lampiran */}
+              {selected.attachments && selected.attachments.length > 0 && (
+                <div className="border-t pt-4">
+                  <div className="text-xs font-semibold text-gray-500 uppercase mb-2 flex items-center gap-1">
+                    <Paperclip size={12} /> Lampiran ({selected.attachments.length})
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {selected.attachments.map(att =>
+                      att.mimeType.startsWith('image/') ? (
+                        <a key={att.id} href={`${API_BASE}${att.fileUrl}`} target="_blank" rel="noreferrer" title={att.fileName}>
+                          <img src={`${API_BASE}${att.fileUrl}`} className="w-full h-20 object-cover rounded border" alt={att.fileName} />
+                        </a>
+                      ) : (
+                        <a key={att.id} href={`${API_BASE}${att.fileUrl}`} target="_blank" rel="noreferrer"
+                          className="flex items-center gap-2 bg-gray-50 border rounded-lg px-3 py-2 text-xs hover:bg-gray-100">
+                          <span className="text-red-600 font-bold">PDF</span>
+                          <span className="truncate">{att.fileName}</span>
+                        </a>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-2 justify-end">
                 <button

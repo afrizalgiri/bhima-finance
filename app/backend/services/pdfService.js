@@ -705,7 +705,7 @@ const generateExpensePdf = (expenses, company, filters, signaturesData = [null, 
 // ═══════════════════════════════════════════════════════
 //  REQUEST FOR PAYMENT — FORMAT RFP FORMAL
 // ═══════════════════════════════════════════════════════
-const generateRfpPdf = (rfp, company, signaturesData = [null, null, null, null]) => new Promise((resolve, reject) => {
+const generateRfpPdf = (rfp, company, signaturesData = [null, null, null, null], attachments = []) => new Promise((resolve, reject) => {
   const doc = buildPdf((err, buf) => err ? reject(err) : resolve(buf));
 
   const NAVY = '#1a3557';
@@ -889,6 +889,52 @@ const generateRfpPdf = (rfp, company, signaturesData = [null, null, null, null])
   // Footer bar
   doc.rect(M, PAGE_H - M - 8, CW, 1.5).fillColor(GOLD).fill();
   doc.rect(M, PAGE_H - M - 4, CW, 4).fillColor(NAVY).fill();
+
+  // ── HALAMAN LAMPIRAN ───────────────────────────────
+  const imageTypes = ['image/jpeg','image/jpg','image/png','image/gif','image/webp'];
+  const imageAtts = (attachments || []).filter(a => imageTypes.includes(a.mimeType));
+  const otherAtts = (attachments || []).filter(a => !imageTypes.includes(a.mimeType));
+
+  // Each image gets its own page
+  imageAtts.forEach((att, idx) => {
+    doc.addPage();
+    // Header strip
+    doc.rect(0, 0, PAGE_W, 36).fillColor(NAVY).fill();
+    doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#fff')
+      .text(`Lampiran ${idx + 1} — ${att.fileName}`, M, 12, { width: PAGE_W - 2 * M });
+
+    const imgPath = path.join(__dirname, '..', att.fileUrl);
+    const availH = PAGE_H - 50;
+    try {
+      doc.image(imgPath, M, 44, {
+        fit: [CW, availH],
+        align: 'center',
+        valign: 'top',
+      });
+    } catch (e) {
+      doc.fontSize(9).font('Helvetica').fillColor('#888')
+        .text('Gambar tidak dapat ditampilkan.', M, 56);
+    }
+  });
+
+  // One page for non-image attachments (if any)
+  if (otherAtts.length > 0) {
+    doc.addPage();
+    doc.rect(0, 0, PAGE_W, 36).fillColor(NAVY).fill();
+    doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#fff')
+      .text('Daftar Lampiran', M, 12, { width: PAGE_W - 2 * M });
+
+    let ly2 = 52;
+    otherAtts.forEach((att, idx) => {
+      doc.rect(M, ly2, CW, 28).fillColor(idx % 2 === 0 ? '#f7f9fc' : '#fff').fill();
+      doc.rect(M, ly2, CW, 28).strokeColor('#e2e8f0').lineWidth(0.4).stroke();
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('#1a3557')
+        .text(`${idx + 1}. ${att.fileName}`, M + 8, ly2 + 7, { width: CW - 16 });
+      doc.fontSize(7.5).font('Helvetica').fillColor('#888')
+        .text(att.mimeType, M + 8, ly2 + 18, { width: CW - 16 });
+      ly2 += 30;
+    });
+  }
 
   doc.end();
 });

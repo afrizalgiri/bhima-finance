@@ -3,8 +3,9 @@ const router = express.Router();
 const ctrl = require('../controllers/expenseRequestController');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 
-// PUBLIC - no auth needed (for team form submissions)
+// PUBLIC - no auth needed
 router.post('/submit', ctrl.create);
+router.post('/upload-attachment', ctrl.uploadAttachment);
 
 // Auth required for all below
 router.use(authenticate);

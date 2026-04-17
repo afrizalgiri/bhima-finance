@@ -263,8 +263,8 @@ model Expense {
 }
 
 model ExpenseRequest {
-  id                String               @id @default(uuid())
-  number            String               @unique
+  id                String                       @id @default(uuid())
+  number            String                       @unique
   date              DateTime
   dueDate           DateTime?
   detailsOfPayment  String?
@@ -274,16 +274,30 @@ model ExpenseRequest {
   email             String?
   beneficiary       String?
   bankNorek         String?
-  rfpCategory       String               @default("OTHERS")
-  status            String               @default("PENDING")
+  rfpCategory       String                       @default("OTHERS")
+  status            String                       @default("PENDING")
   notes             String?
   items             ExpenseRequestItem[]
+  attachments       ExpenseRequestAttachment[]
   submittedByUserId String?
-  submittedBy       User?                @relation(fields: [submittedByUserId], references: [id], onDelete: SetNull)
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
+  submittedBy       User?                        @relation(fields: [submittedByUserId], references: [id], onDelete: SetNull)
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
 
   @@map("expense_requests")
+}
+
+model ExpenseRequestAttachment {
+  id        String         @id @default(uuid())
+  requestId String
+  request   ExpenseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fileName  String
+  fileUrl   String
+  mimeType  String
+  fileSize  Int?
+  createdAt DateTime       @default(now())
+
+  @@map("expense_request_attachments")
 }
 
 model ExpenseRequestItem {

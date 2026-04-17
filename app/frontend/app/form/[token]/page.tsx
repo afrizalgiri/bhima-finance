@@ -1,8 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Plus, Trash2, Send, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Send, CheckCircle, XCircle, Loader2, Paperclip, X as XIcon } from 'lucide-react';
 import api from '../../../lib/api';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
 const CATEGORIES = [
   { value: 'SALTAB_EVENT', label: 'SALTAB EVENT' },
@@ -36,6 +38,8 @@ export default function FormTokenPage() {
     notes: '',
   });
   const [items, setItems] = useState<Item[]>([initialItem()]);
+  const [attachments, setAttachments] = useState<Array<{fileName:string;fileUrl:string;mimeType:string;fileSize:number}>>([]);
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -68,6 +72,27 @@ export default function FormTokenPage() {
   const fmt = (n: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await api.post('/expense-requests/upload-attachment', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        if (res.data.success) setAttachments(prev => [...prev, res.data.data]);
+      }
+    } catch {
+      setError('Gagal upload file. Pastikan format file adalah gambar atau PDF.');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -81,6 +106,7 @@ export default function FormTokenPage() {
         ...form,
         formToken: token,
         items: validItems.map(it => ({ description: it.description, amount: parseFloat(it.amount) })),
+        attachments,
       });
       if (res.data.success) {
         setSuccess(res.data.message || 'Request berhasil dikirim!');
@@ -315,12 +341,42 @@ export default function FormTokenPage() {
               className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
           </div>
 
+          {/* Lampiran */}
+          <div className="px-6 py-5 border-t bg-gray-50">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-semibold text-blue-900 uppercase tracking-wide flex items-center gap-1"><Paperclip size={12} />Lampiran Dokumen (opsional)</h3>
+              <label className={`text-xs font-semibold text-blue-700 cursor-pointer hover:text-blue-800 ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                {uploading ? 'Mengupload...' : '+ Tambah File'}
+                <input type="file" multiple accept="image/*,.pdf" className="hidden" onChange={handleFileChange} disabled={uploading} />
+              </label>
+            </div>
+            <p className="text-xs text-gray-400 mb-2">Lampirkan bukti/dokumen pendukung (foto, PDF). Maks 10MB per file.</p>
+            {attachments.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">Belum ada lampiran</p>
+            ) : (
+              <div className="space-y-1.5">
+                {attachments.map((att, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-white border rounded-lg px-3 py-2 text-xs shadow-sm">
+                    {att.mimeType.startsWith('image/') ? (
+                      <img src={`${API_BASE}${att.fileUrl}`} alt={att.fileName} className="w-8 h-8 object-cover rounded" />
+                    ) : (
+                      <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center text-red-600 font-bold text-xs">PDF</div>
+                    )}
+                    <span className="flex-1 truncate text-gray-700">{att.fileName}</span>
+                    <button type="button" onClick={() => setAttachments(prev => prev.filter((_,i)=>i!==idx))}
+                      className="text-gray-400 hover:text-red-500"><XIcon size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {error && (
             <div className="mx-6 mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
           )}
 
           <div className="px-6 pb-6">
-            <button type="submit" disabled={loading}
+            <button type="submit" disabled={loading || uploading}
               className="w-full flex items-center justify-center gap-2 py-3 bg-blue-900 hover:bg-blue-800 text-white font-semibold rounded-xl text-sm disabled:opacity-60 transition-colors">
               {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               {loading ? 'Mengirim...' : 'Kirim Request for Payment'}
