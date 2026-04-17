@@ -109,7 +109,7 @@ const update = async (req, res) => {
       attention, project, description, items, taxRate, notes, paymentTerms, status, headerColor,
     } = req.body;
 
-    let updateData: any = {
+    let updateData = {
       number: number || undefined,
       date: date ? new Date(date) : undefined,
       dueDate: dueDate !== undefined ? (dueDate ? new Date(dueDate) : null) : undefined,
