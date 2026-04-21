@@ -85,10 +85,11 @@ const create = async (req, res) => {
 
 const update = async (req, res) => {
   try {
-    const { clientId, date, dueDate, items, taxRate = 0, notes, status, openingText, closingText, headerColor, signatureId } = req.body;
+    const { number, clientId, date, dueDate, items, taxRate = 0, notes, status, openingText, closingText, headerColor, signatureId } = req.body;
 
     let updateData = {
       status, notes,
+      number: number || undefined,
       date: date ? new Date(date) : undefined,
       dueDate: dueDate ? new Date(dueDate) : undefined,
       openingText: openingText ?? undefined,
