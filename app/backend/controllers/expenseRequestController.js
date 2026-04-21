@@ -407,4 +407,32 @@ const bossDecide = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getOne, create, updateStatus, remove, generatePdf, submitAuthenticated, mySubmissions, uploadAttachment, updateTransferInfo, sendToBoss, getBossApproval, bossDecide };
+// Get all RFP attachments (for lampiran archive page)
+const getAllAttachments = async (req, res) => {
+  try {
+    const { search } = req.query;
+    const attachments = await prisma.expenseRequestAttachment.findMany({
+      include: {
+        request: {
+          select: { id: true, number: true, name: true, date: true, status: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const filtered = search
+      ? attachments.filter(a =>
+          a.fileName.toLowerCase().includes(search.toLowerCase()) ||
+          a.request?.number?.toLowerCase().includes(search.toLowerCase()) ||
+          a.request?.name?.toLowerCase().includes(search.toLowerCase())
+        )
+      : attachments;
+
+    res.json({ success: true, data: filtered });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+module.exports = { getAll, getOne, create, updateStatus, remove, generatePdf, submitAuthenticated, mySubmissions, uploadAttachment, updateTransferInfo, sendToBoss, getBossApproval, bossDecide, getAllAttachments };

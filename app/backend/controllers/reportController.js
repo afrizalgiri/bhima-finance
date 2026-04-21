@@ -483,7 +483,15 @@ const excelExport = async (req, res) => {
       rfps.forEach((r, i) => {
         const total = r.items.reduce((s, it) => s + Number(it.amount), 0);
         grandTotal += total;
-        const attCount = (r.attachments || []).length;
+        const atts = r.attachments || [];
+        const attCount = atts.length;
+        const firstUrl = attCount > 0 ? `${baseUrl}${atts[0].fileUrl}` : null;
+        const attCell = attCount === 0
+          ? '-'
+          : attCount === 1
+            ? { text: 'Lihat (1 file)', hyperlink: firstUrl, tooltip: firstUrl }
+            : { text: `Lihat (${attCount} file)`, hyperlink: firstUrl, tooltip: `${attCount} lampiran — lihat sheet "Lampiran RFP"` };
+
         const row = ws.addRow([
           i + 1,
           r.number,
@@ -493,12 +501,16 @@ const excelExport = async (req, res) => {
           RFP_CATEGORY_LABELS[r.rfpCategory] || r.rfpCategory,
           STATUS_LABELS[r.status] || r.status,
           total,
-          attCount > 0 ? `${attCount} file` : '-',
+          attCell,
         ]);
         applyDataRow(ws, row, i, 9);
         ws.getCell(row.number, 8).numFmt = '#,##0';
         ws.getCell(row.number, 8).alignment = { horizontal: 'right', vertical: 'middle' };
-        ws.getCell(row.number, 9).alignment = { horizontal: 'center', vertical: 'middle' };
+        const attCellRef = ws.getCell(row.number, 9);
+        attCellRef.alignment = { horizontal: 'center', vertical: 'middle' };
+        if (attCount > 0) {
+          attCellRef.font = { color: { argb: 'FF2563EB' }, underline: true, size: 10 };
+        }
 
         const sc = ws.getCell(row.number, 7);
         if (r.status === 'APPROVED') sc.font = { ...sc.font, color: { argb: GREEN }, bold: true };

@@ -12,6 +12,7 @@ router.post('/boss-approval/:token/decide', ctrl.bossDecide);
 // Auth required for all below
 router.use(authenticate);
 router.get('/my', ctrl.mySubmissions);
+router.get('/attachments', ctrl.getAllAttachments);
 router.post('/my-submit', ctrl.submitAuthenticated);
 router.get('/', ctrl.getAll);
 router.get('/:id', ctrl.getOne);
