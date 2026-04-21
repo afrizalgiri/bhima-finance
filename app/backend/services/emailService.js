@@ -330,4 +330,80 @@ async function sendBossApprovalEmail(rfp, bossApproval, approvalUrl, company) {
   }
 }
 
-module.exports = { sendRfpStatusEmail, sendOtpEmail, sendWelcomeEmail, sendBossApprovalEmail };
+async function sendSlipGajiEmail(payroll, toEmail, pdfBuffer, company) {
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.log('[Email] SMTP not configured, skipping slip gaji email');
+    return;
+  }
+
+  const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const companyName = company?.name || 'Bhima Finance';
+  const monthName = MONTHS[payroll.month - 1];
+  const periode = `${monthName} ${payroll.year}`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f0f4f8;font-family:Arial,sans-serif">
+  <div style="max-width:540px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+    <div style="background:#1B3A5C;padding:24px 32px">
+      <h1 style="margin:0;color:#fff;font-size:18px;font-weight:700">${companyName}</h1>
+      <p style="margin:4px 0 0;color:#93c5fd;font-size:13px">Slip Gaji — ${periode}</p>
+    </div>
+    <div style="padding:28px 32px">
+      <p style="color:#374151;font-size:15px;margin-top:0">Halo <strong>${payroll.employeeName}</strong>,</p>
+      <p style="color:#374151;font-size:14px;line-height:1.6">
+        Berikut slip gaji Anda untuk periode <strong>${periode}</strong>. Slip gaji terlampir dalam format PDF.
+      </p>
+
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:20px 0">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <tr><td style="color:#6b7280;padding:5px 0;width:160px">Nama Karyawan</td><td style="color:#111827;font-weight:600">${payroll.employeeName}</td></tr>
+          ${payroll.position ? `<tr><td style="color:#6b7280;padding:5px 0">Jabatan</td><td style="color:#111827">${payroll.position}</td></tr>` : ''}
+          ${payroll.department ? `<tr><td style="color:#6b7280;padding:5px 0">Departemen</td><td style="color:#111827">${payroll.department}</td></tr>` : ''}
+          <tr><td style="color:#6b7280;padding:5px 0">Periode</td><td style="color:#111827">${periode}</td></tr>
+          <tr><td style="color:#6b7280;padding:5px 0">Gaji Pokok</td><td style="color:#111827">${fmt(payroll.baseSalary)}</td></tr>
+          <tr><td style="color:#6b7280;padding:5px 0">Tunjangan</td><td style="color:#111827">${fmt(payroll.allowances)}</td></tr>
+          ${Number(payroll.deductions) > 0 ? `<tr><td style="color:#6b7280;padding:5px 0">Potongan</td><td style="color:#dc2626">- ${fmt(payroll.deductions)}</td></tr>` : ''}
+        </table>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0">
+          <table style="width:100%;border-collapse:collapse">
+            <tr>
+              <td style="font-size:14px;font-weight:700;color:#1B3A5C">GAJI BERSIH</td>
+              <td style="font-size:16px;font-weight:800;color:#1B3A5C;text-align:right">${fmt(payroll.netSalary)}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <p style="color:#6b7280;font-size:13px">Slip gaji lengkap tersedia dalam file PDF yang terlampir.</p>
+      ${payroll.notes ? `<p style="color:#374151;font-size:13px"><strong>Catatan:</strong> ${payroll.notes}</p>` : ''}
+    </div>
+    <div style="padding:16px 32px 24px;border-top:1px solid #e2e8f0">
+      <p style="margin:0;font-size:12px;color:#9ca3af">Email ini dikirim otomatis oleh sistem ${companyName}. Jangan membalas email ini.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const monthStr = String(payroll.month).padStart(2, '0');
+  const filename = `SlipGaji_${payroll.employeeName.replace(/\s+/g, '_')}_${payroll.year}_${monthStr}.pdf`;
+
+  try {
+    await transporter.sendMail({
+      from: `"${companyName}" <${process.env.SMTP_USER}>`,
+      to: toEmail,
+      subject: `Slip Gaji ${payroll.employeeName} — ${periode}`,
+      html,
+      attachments: [{ filename, content: pdfBuffer, contentType: 'application/pdf' }],
+    });
+    console.log(`[Email] Slip gaji sent to ${toEmail}`);
+  } catch (e) {
+    console.error('[Email] Failed to send slip gaji:', e.message);
+    throw e;
+  }
+}
+
+module.exports = { sendRfpStatusEmail, sendOtpEmail, sendWelcomeEmail, sendBossApprovalEmail, sendSlipGajiEmail };

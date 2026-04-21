@@ -11,20 +11,31 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { cn } from '../lib/utils';
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/clients', label: 'Klien', icon: Users },
-  { href: '/products', label: 'Produk & Layanan', icon: Package },
-  { href: '/sph', label: 'SPH', icon: FileText },
-  { href: '/invoices', label: 'Invoice', icon: Receipt },
-  { href: '/lampiran', label: 'Lampiran', icon: Paperclip },
-  { href: '/po', label: 'Purchase Order', icon: ShoppingCart },
-  { href: '/norek', label: 'Norek Karyawan', icon: Landmark },
-  { href: '/payments', label: 'Pembayaran', icon: CreditCard },
-  { href: '/expenses', label: 'Pengeluaran', icon: DollarSign },
-  { href: '/expense-requests', label: 'Request for Payment', icon: ClipboardList },
-  { href: '/reports', label: 'Laporan', icon: BarChart3 },
-  { href: '/settings', label: 'Pengaturan', icon: Settings },
+// All app routes with their feature key
+const ALL_NAV = [
+  { href: '/dashboard',        label: 'Dashboard',           icon: LayoutDashboard, key: 'dashboard' },
+  { href: '/clients',          label: 'Klien',               icon: Users,            key: 'clients' },
+  { href: '/products',         label: 'Produk & Layanan',    icon: Package,          key: 'products' },
+  { href: '/sph',              label: 'SPH',                  icon: FileText,         key: 'sph' },
+  { href: '/invoices',         label: 'Invoice',              icon: Receipt,          key: 'invoices' },
+  { href: '/lampiran',         label: 'Lampiran',             icon: Paperclip,        key: 'lampiran' },
+  { href: '/po',               label: 'Purchase Order',       icon: ShoppingCart,     key: 'po' },
+  { href: '/norek',            label: 'Norek Karyawan',       icon: Landmark,         key: 'norek' },
+  { href: '/payments',         label: 'Pembayaran',           icon: CreditCard,       key: 'payments' },
+  { href: '/expenses',         label: 'Pengeluaran',          icon: DollarSign,       key: 'expenses' },
+  { href: '/expense-requests', label: 'Request for Payment',  icon: ClipboardList,    key: 'expense-requests' },
+  { href: '/reports',          label: 'Laporan',              icon: BarChart3,        key: 'reports' },
+  { href: '/payroll',          label: 'Slip Gaji',            icon: Banknote,         key: 'payroll' },
+  { href: '/history',          label: 'Riwayat Aktivitas',   icon: History,          key: 'history' },
+  { href: '/settings',         label: 'Pengaturan',           icon: Settings,         key: 'settings' },
+];
+
+// Admin-only items (never shown to STAFF)
+const ADMIN_ONLY_KEYS = new Set(['settings']);
+// Admin section (shown below divider)
+const ADMIN_SECTION = [
+  { href: '/users',      label: 'Manajemen User',       icon: UserCog },
+  { href: '/signatures', label: 'Tanda Tangan Digital', icon: PenLine },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -33,22 +44,45 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const featureAccess: string[] = user?.featureAccess || [];
+  const isAdmin = user?.role === 'ADMIN';
+
+  // For STAFF: allowed paths based on featureAccess + always allowed
+  const allowedPaths = isAdmin ? null : [
+    '/expense-requests',
+    ...ALL_NAV.filter(n => !ADMIN_ONLY_KEYS.has(n.key) && featureAccess.includes(n.key)).map(n => n.href),
+  ];
+
   useEffect(() => {
     if (!loading && !user) { router.push('/login'); return; }
-    // STAFF can only access /expense-requests
-    if (!loading && user && user.role === 'STAFF' && !pathname.startsWith('/expense-requests')) {
-      router.replace('/expense-requests');
+    if (!loading && user && !isAdmin) {
+      // Check if current path is allowed
+      const allowed = allowedPaths || [];
+      const isAllowed = allowed.some(p => pathname === p || pathname.startsWith(p + '/'));
+      if (!isAllowed) {
+        router.replace('/expense-requests');
+      }
     }
   }, [user, loading, router, pathname]);
 
-  if (loading || !user) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
+  if (loading || !user) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+    </div>
+  );
+
+  // Build STAFF nav items
+  const staffNavItems = [
+    // RFP always first
+    ALL_NAV.find(n => n.key === 'expense-requests')!,
+    // Other permitted items (excluding RFP and admin-only)
+    ...ALL_NAV.filter(n => n.key !== 'expense-requests' && !ADMIN_ONLY_KEYS.has(n.key) && featureAccess.includes(n.key)),
+  ];
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      {/* Mobile overlay */}
       {sidebarOpen && <div className="fixed inset-0 z-20 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      {/* Sidebar */}
       <aside className={cn(
         'fixed top-0 left-0 z-30 h-full w-64 bg-white border-r border-gray-200 flex flex-col transition-transform duration-200 lg:translate-x-0 lg:static lg:z-auto',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -62,19 +96,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3">
-          {user.role === 'STAFF' ? (
-            // STAFF: only Request for Payment
-            <Link href="/expense-requests" onClick={() => setSidebarOpen(false)}
-              className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
-                pathname.startsWith('/expense-requests') ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
-              )}>
-              <ClipboardList size={18} />
-              Request for Payment
-            </Link>
-          ) : (
+          {isAdmin ? (
             // ADMIN: full nav
             <>
-              {navItems.map(item => {
+              {ALL_NAV.map(item => {
                 const Icon = item.icon;
                 const active = pathname === item.href || pathname.startsWith(item.href + '/');
                 return (
@@ -87,44 +112,36 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </Link>
                 );
               })}
-              {(user.role === 'ADMIN' || user.canViewHistory) && (
-                <Link href="/history" onClick={() => setSidebarOpen(false)}
-                  className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
-                    pathname === '/history' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
-                  )}>
-                  <History size={18} />
-                  Riwayat Aktivitas
-                </Link>
-              )}
-              {(user.role === 'ADMIN' || user.canViewSalary) && (
-                <Link href="/payroll" onClick={() => setSidebarOpen(false)}
-                  className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
-                    pathname === '/payroll' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
-                  )}>
-                  <Banknote size={18} />
-                  Slip Gaji
-                </Link>
-              )}
-              {user.role === 'ADMIN' && (
-                <>
-                  <div className="px-3 pt-3 pb-1 text-xs text-gray-400 uppercase tracking-wide">Admin</div>
-                  <Link href="/users" onClick={() => setSidebarOpen(false)}
+              <div className="px-3 pt-3 pb-1 text-xs text-gray-400 uppercase tracking-wide">Admin</div>
+              {ADMIN_SECTION.map(item => {
+                const Icon = item.icon;
+                const active = pathname === item.href || pathname.startsWith(item.href + '/');
+                return (
+                  <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
                     className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
-                      pathname === '/users' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
+                      active ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
                     )}>
-                    <UserCog size={18} />
-                    Manajemen User
+                    <Icon size={18} />
+                    {item.label}
                   </Link>
-                  <Link href="/signatures" onClick={() => setSidebarOpen(false)}
-                    className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
-                      pathname === '/signatures' ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
-                    )}>
-                    <PenLine size={18} />
-                    Tanda Tangan Digital
-                  </Link>
-                </>
-              )}
+                );
+              })}
             </>
+          ) : (
+            // STAFF: only permitted items
+            staffNavItems.map(item => {
+              const Icon = item.icon;
+              const active = pathname === item.href || pathname.startsWith(item.href + '/');
+              return (
+                <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
+                  className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-1 transition-colors',
+                    active ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100'
+                  )}>
+                  <Icon size={18} />
+                  {item.label}
+                </Link>
+              );
+            })
           )}
         </nav>
 
@@ -140,7 +157,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 h-14 flex items-center gap-3 lg:px-6">
           <button className="lg:hidden" onClick={() => setSidebarOpen(true)}><Menu size={20} /></button>

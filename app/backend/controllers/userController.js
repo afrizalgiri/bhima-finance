@@ -2,12 +2,20 @@ const bcrypt = require('bcryptjs');
 const prisma = require('../lib/prisma');
 const { sendWelcomeEmail } = require('../services/emailService');
 
-const userSelect = { id: true, name: true, email: true, role: true, isActive: true, canViewHistory: true, canViewSalary: true, createdAt: true };
+const userSelect = { id: true, name: true, email: true, role: true, isActive: true, canViewHistory: true, canViewSalary: true, featureAccess: true, createdAt: true };
+
+function parseFeatureAccess(raw) {
+  try { return JSON.parse(raw || '[]'); } catch { return []; }
+}
+
+function serializeUser(u) {
+  return { ...u, featureAccess: parseFeatureAccess(u.featureAccess) };
+}
 
 const listUsers = async (req, res) => {
   try {
     const users = await prisma.user.findMany({ select: userSelect, orderBy: { createdAt: 'asc' } });
-    res.json({ success: true, data: users });
+    res.json({ success: true, data: users.map(serializeUser) });
   } catch {
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -58,13 +66,19 @@ const updatePermissions = async (req, res) => {
     return res.status(403).json({ success: false, message: 'Admin only' });
   }
   const { id } = req.params;
-  const { canViewHistory, canViewSalary } = req.body;
+  const { canViewHistory, canViewSalary, featureAccess } = req.body;
   try {
     const data = {};
     if (typeof canViewHistory === 'boolean') data.canViewHistory = canViewHistory;
     if (typeof canViewSalary === 'boolean') data.canViewSalary = canViewSalary;
+    if (Array.isArray(featureAccess)) {
+      data.featureAccess = JSON.stringify(featureAccess);
+      // sync legacy flags for backward compat
+      data.canViewHistory = featureAccess.includes('history');
+      data.canViewSalary = featureAccess.includes('payroll');
+    }
     const user = await prisma.user.update({ where: { id }, data, select: userSelect });
-    res.json({ success: true, data: user });
+    res.json({ success: true, data: serializeUser(user) });
   } catch {
     res.status(500).json({ success: false, message: 'Server error' });
   }

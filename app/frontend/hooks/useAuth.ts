@@ -9,6 +9,7 @@ interface User {
   role: string;
   canViewHistory?: boolean;
   canViewSalary?: boolean;
+  featureAccess?: string[];
 }
 
 interface AuthContextType {

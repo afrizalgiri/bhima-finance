@@ -17,6 +17,7 @@ model User {
   isActive          Boolean          @default(true)
   canViewHistory    Boolean          @default(false)
   canViewSalary     Boolean          @default(false)
+  featureAccess     String           @default("[]")
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   activityLogs      ActivityLog[]
@@ -56,6 +57,8 @@ model Payroll {
   employeeName String
   month        Int
   year         Int
+  position     String?
+  department   String?
   baseSalary   Float    @default(0)
   allowances   Float    @default(0)
   deductions   Float    @default(0)

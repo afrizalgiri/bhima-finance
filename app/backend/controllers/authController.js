@@ -88,7 +88,7 @@ const verifyOtp = async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, email: true, role: true, isActive: true, canViewHistory: true, canViewSalary: true },
+      select: { id: true, name: true, email: true, role: true, isActive: true, canViewHistory: true, canViewSalary: true, featureAccess: true },
     });
 
     if (!user || !user.isActive) {
@@ -101,10 +101,13 @@ const verifyOtp = async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
+    let featureAccess = [];
+    try { featureAccess = JSON.parse(user.featureAccess || '[]'); } catch {}
+
     res.json({
       success: true,
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, canViewHistory: user.canViewHistory, canViewSalary: user.canViewSalary },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, canViewHistory: user.canViewHistory, canViewSalary: user.canViewSalary, featureAccess },
     });
   } catch (error) {
     console.error('[Auth] verifyOtp error:', error);

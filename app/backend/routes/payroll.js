@@ -7,5 +7,7 @@ router.get('/', ctrl.getAll);
 router.post('/', ctrl.create);
 router.put('/:id', ctrl.update);
 router.delete('/:id', ctrl.remove);
+router.get('/:id/pdf', ctrl.generatePdf);
+router.post('/:id/send-email', ctrl.sendEmail);
 
 module.exports = router;
