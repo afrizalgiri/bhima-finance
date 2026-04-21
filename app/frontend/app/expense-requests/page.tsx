@@ -5,6 +5,7 @@ import api from '../../lib/api';
 import {
   Search, Eye, Trash2, Download, RefreshCw, Copy, Plus,
   CheckCircle2, Clock, Link2, ChevronDown, ChevronUp, Paperclip, X as XIcon,
+  Send, Building2,
 } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -41,6 +42,7 @@ interface Rfp {
 }
 interface Signature { id: string; name: string; title?: string; imageUrl: string; }
 interface FormToken { id: string; token: string; label: string | null; usedAt: string | null; createdAt: string; }
+interface BankAccount { id: string; employeeName: string; bankName: string; accountNumber: string; accountHolder: string; isActive: boolean; }
 
 export default function ExpenseRequestsPage() {
   const { user } = useAuth();
@@ -64,6 +66,16 @@ export default function ExpenseRequestsPage() {
   const [generating, setGenerating] = useState(false);
   const [copiedId, setCopiedId] = useState('');
   const [showLinkPanel, setShowLinkPanel] = useState(true);
+
+  // Bank accounts + transfer info
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [selectedBankId, setSelectedBankId] = useState('');
+  const [transferForm, setTransferForm] = useState({ beneficiary: '', bankNorek: '' });
+  const [savingTransfer, setSavingTransfer] = useState(false);
+  // Boss approval
+  const [showBossDialog, setShowBossDialog] = useState(false);
+  const [bossForm, setBossForm] = useState({ bossEmail: '', bossName: '' });
+  const [sendingToBoss, setSendingToBoss] = useState(false);
 
   // STAFF-only state
   const [staffTab, setStaffTab] = useState<'submit' | 'history'>('submit');
@@ -110,6 +122,13 @@ export default function ExpenseRequestsPage() {
     try {
       const res = await api.get('/signatures');
       if (res.data.success) setSignatures(res.data.data);
+    } catch (e) {}
+  }, []);
+
+  const fetchBankAccounts = useCallback(async () => {
+    try {
+      const res = await api.get('/employee-banks');
+      if (res.data.success) setBankAccounts(res.data.data.filter((b: BankAccount) => b.isActive));
     } catch (e) {}
   }, []);
 
@@ -175,7 +194,7 @@ export default function ExpenseRequestsPage() {
   };
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
-  useEffect(() => { fetchTokens(); fetchSignatures(); }, [fetchTokens, fetchSignatures]);
+  useEffect(() => { fetchTokens(); fetchSignatures(); fetchBankAccounts(); }, [fetchTokens, fetchSignatures, fetchBankAccounts]);
   useEffect(() => { if (user?.role === 'STAFF') fetchMyRfps(); }, [user, fetchMyRfps]);
 
   const generateLink = async () => {
@@ -201,7 +220,45 @@ export default function ExpenseRequestsPage() {
   const openDetail = (rfp: Rfp) => {
     setSelected(rfp);
     setStatusUpdate({ status: rfp.status, notes: rfp.notes || '' });
+    setTransferForm({ beneficiary: rfp.beneficiary || '', bankNorek: rfp.bankNorek || '' });
+    setSelectedBankId('');
     setShowDetail(true);
+  };
+
+  const handleBankSelect = (bankId: string) => {
+    setSelectedBankId(bankId);
+    if (bankId) {
+      const acc = bankAccounts.find(b => b.id === bankId);
+      if (acc) setTransferForm({ beneficiary: acc.accountHolder, bankNorek: `${acc.bankName} — ${acc.accountNumber}` });
+    }
+  };
+
+  const handleSaveTransfer = async () => {
+    if (!selected) return;
+    setSavingTransfer(true);
+    try {
+      const res = await api.patch(`/expense-requests/${selected.id}/transfer`, transferForm);
+      if (res.data.success) { setSelected(res.data.data); fetchAll(); }
+    } catch (e) {}
+    finally { setSavingTransfer(false); }
+  };
+
+  const handleSendToBoss = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected) return;
+    setSendingToBoss(true);
+    try {
+      const res = await api.post(`/expense-requests/${selected.id}/send-to-boss`, bossForm);
+      if (res.data.success) {
+        setShowBossDialog(false);
+        setBossForm({ bossEmail: '', bossName: '' });
+        alert(res.data.message);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Gagal mengirim email');
+    } finally {
+      setSendingToBoss(false);
+    }
   };
 
   const handleUpdateStatus = async () => {
@@ -302,6 +359,14 @@ export default function ExpenseRequestsPage() {
               <input type="text" value={staffForm.project} onChange={e => setStaffForm(f => ({ ...f, project: e.target.value }))}
                 placeholder="Nama proyek (opsional)"
                 className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Deskripsi / Latar Belakang (5W1H)</label>
+              <textarea value={staffForm.description} onChange={e => setStaffForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Jelaskan: Apa, Siapa, Kapan, Dimana, Mengapa, Bagaimana — agar admin & atasan memahami tujuan pengajuan ini"
+                rows={3}
+                className="w-full px-3 py-2 text-sm border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -697,6 +762,12 @@ export default function ExpenseRequestsPage() {
                   </div>
                 ))}
               </div>
+              {selected.description && (
+                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                  <div className="text-xs font-semibold text-blue-600 uppercase mb-1">Deskripsi / Latar Belakang</div>
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{selected.description}</p>
+                </div>
+              )}
 
               <div>
                 <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Items</div>
@@ -723,6 +794,60 @@ export default function ExpenseRequestsPage() {
                   </tfoot>
                 </table>
               </div>
+
+              {/* Transfer Info */}
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <div className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Building2 size={15} className="text-blue-600" /> Info Transfer (Norek Karyawan)
+                </div>
+                <div className="mb-3">
+                  <label className="text-xs text-gray-500 mb-1 block">Pilih dari Norek Terdaftar</label>
+                  <select
+                    className="w-full px-3 py-2 text-sm border rounded-lg bg-white"
+                    value={selectedBankId}
+                    onChange={e => handleBankSelect(e.target.value)}
+                  >
+                    <option value="">— Pilih rekening karyawan —</option>
+                    {bankAccounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.employeeName} — {acc.bankName} {acc.accountNumber}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Beneficiary / Atas Nama</label>
+                    <input className="w-full px-3 py-2 text-sm border rounded-lg" placeholder="Nama penerima"
+                      value={transferForm.beneficiary} onChange={e => setTransferForm(f => ({ ...f, beneficiary: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Bank & No. Rekening</label>
+                    <input className="w-full px-3 py-2 text-sm border rounded-lg" placeholder="Bank — No. Rek"
+                      value={transferForm.bankNorek} onChange={e => setTransferForm(f => ({ ...f, bankNorek: e.target.value }))} />
+                  </div>
+                </div>
+                <button onClick={handleSaveTransfer} disabled={savingTransfer}
+                  className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                  {savingTransfer ? 'Menyimpan...' : 'Simpan Info Transfer'}
+                </button>
+              </div>
+
+              {/* Send to Boss */}
+              {grandTotal(selected) >= 5000000 && (
+                <div className="border border-amber-200 rounded-lg p-4 bg-amber-50">
+                  <div className="text-sm font-semibold text-amber-800 mb-1 flex items-center gap-2">
+                    <Send size={15} /> Pengajuan {'>'}= Rp 5.000.000 — Perlu Persetujuan Atasan
+                  </div>
+                  <p className="text-xs text-amber-700 mb-3">Kirim email ke atasan agar mereka dapat menyetujui atau menolak langsung dari email.</p>
+                  <button
+                    onClick={() => setShowBossDialog(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700"
+                  >
+                    <Send size={14} /> Kirim ke Atasan
+                  </button>
+                </div>
+              )}
 
               <div className="border rounded-lg p-4 bg-gray-50">
                 <div className="text-sm font-semibold text-gray-700 mb-3">Update Status</div>
@@ -801,6 +926,49 @@ export default function ExpenseRequestsPage() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── BOSS APPROVAL DIALOG ── */}
+      {showBossDialog && selected && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl">
+            <div className="p-5 border-b flex items-center justify-between">
+              <h2 className="font-bold text-gray-900">Kirim ke Atasan — {selected.number}</h2>
+              <button onClick={() => setShowBossDialog(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            </div>
+            <form onSubmit={handleSendToBoss} className="p-5 space-y-4">
+              <p className="text-sm text-gray-600">
+                Atasan akan menerima email dengan detail pengajuan dan tombol Setujui / Tolak. Status RFP akan berubah otomatis setelah keputusan diberikan.
+              </p>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Email Atasan *</label>
+                <input type="email" required
+                  value={bossForm.bossEmail}
+                  onChange={e => setBossForm(f => ({ ...f, bossEmail: e.target.value }))}
+                  placeholder="nama@perusahaan.com"
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Nama Atasan</label>
+                <input type="text"
+                  value={bossForm.bossName}
+                  onChange={e => setBossForm(f => ({ ...f, bossName: e.target.value }))}
+                  placeholder="Bpk/Ibu ..."
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <button type="button" onClick={() => setShowBossDialog(false)} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Batal</button>
+                <button type="submit" disabled={sendingToBoss}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50">
+                  <Send size={14} />
+                  {sendingToBoss ? 'Mengirim...' : 'Kirim Email'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -281,6 +281,7 @@ model ExpenseRequest {
   notes             String?
   items             ExpenseRequestItem[]
   attachments       ExpenseRequestAttachment[]
+  bossApprovals     BossApproval[]
   submittedByUserId String?
   submittedBy       User?                        @relation(fields: [submittedByUserId], references: [id], onDelete: SetNull)
   createdAt         DateTime                     @default(now())
@@ -367,6 +368,39 @@ model PoItem {
   updatedAt   DateTime @updatedAt
 
   @@map("po_items")
+}
+
+// ─── EMPLOYEE BANK ACCOUNTS ──────────────────────────────
+model EmployeeBankAccount {
+  id            String   @id @default(uuid())
+  employeeName  String
+  bankName      String
+  accountNumber String
+  accountHolder String
+  notes         String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("employee_bank_accounts")
+}
+
+// ─── BOSS APPROVAL ───────────────────────────────────────
+model BossApproval {
+  id         String         @id @default(uuid())
+  rfpId      String
+  rfp        ExpenseRequest @relation(fields: [rfpId], references: [id], onDelete: Cascade)
+  token      String         @unique @default(uuid())
+  bossEmail  String
+  bossName   String?
+  status     String         @default("PENDING") // PENDING | APPROVED | REJECTED
+  notes      String?
+  sentAt     DateTime       @default(now())
+  decidedAt  DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@map("boss_approvals")
 }
 
 // ─── LAMPIRAN ────────────────────────────────────────────

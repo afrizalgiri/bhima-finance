@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import {
   LayoutDashboard, Users, Package, FileText, Receipt,
   CreditCard, DollarSign, BarChart3, Settings, LogOut, Menu, X, UserCog,
-  History, Banknote, PenLine, ClipboardList, Paperclip, ShoppingCart
+  History, Banknote, PenLine, ClipboardList, Paperclip, ShoppingCart, Landmark
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -19,6 +19,7 @@ const navItems = [
   { href: '/invoices', label: 'Invoice', icon: Receipt },
   { href: '/lampiran', label: 'Lampiran', icon: Paperclip },
   { href: '/po', label: 'Purchase Order', icon: ShoppingCart },
+  { href: '/norek', label: 'Norek Karyawan', icon: Landmark },
   { href: '/payments', label: 'Pembayaran', icon: CreditCard },
   { href: '/expenses', label: 'Pengeluaran', icon: DollarSign },
   { href: '/expense-requests', label: 'Request for Payment', icon: ClipboardList },

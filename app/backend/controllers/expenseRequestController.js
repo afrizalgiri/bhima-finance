@@ -1,7 +1,7 @@
 const { generateRfpPdf } = require('../services/pdfService');
 const { generateRfpNumber } = require('../utils/numberGenerator');
 const { logActivity } = require('../utils/activityLog');
-const { sendRfpStatusEmail } = require('../services/emailService');
+const { sendRfpStatusEmail, sendBossApprovalEmail } = require('../services/emailService');
 const prisma = require('../lib/prisma');
 const multer = require('multer');
 const path = require('path');
@@ -290,4 +290,121 @@ const mySubmissions = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getOne, create, updateStatus, remove, generatePdf, submitAuthenticated, mySubmissions, uploadAttachment };
+// ADMIN - update transfer info (beneficiary + bank norek) before approve
+const updateTransferInfo = async (req, res) => {
+  try {
+    const { beneficiary, bankNorek } = req.body;
+    const rfp = await prisma.expenseRequest.update({
+      where: { id: req.params.id },
+      data: {
+        beneficiary: beneficiary !== undefined ? (beneficiary || null) : undefined,
+        bankNorek: bankNorek !== undefined ? (bankNorek || null) : undefined,
+      },
+      include: { items: true, attachments: true },
+    });
+    res.json({ success: true, data: rfp });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ADMIN - send RFP to boss for approval
+const sendToBoss = async (req, res) => {
+  try {
+    const { bossEmail, bossName } = req.body;
+    if (!bossEmail) return res.status(400).json({ success: false, message: 'Email atasan wajib diisi' });
+
+    const rfp = await prisma.expenseRequest.findUnique({
+      where: { id: req.params.id },
+      include: { items: true },
+    });
+    if (!rfp) return res.status(404).json({ success: false, message: 'RFP tidak ditemukan' });
+
+    // Create or update boss approval record
+    const bossApproval = await prisma.bossApproval.create({
+      data: {
+        rfpId: rfp.id,
+        bossEmail,
+        bossName: bossName || null,
+        status: 'PENDING',
+        sentAt: new Date(),
+      },
+    });
+
+    const company = await prisma.companySetting.findFirst();
+    const frontendUrl = process.env.FRONTEND_URL?.split(',')[0]?.trim() || 'http://localhost:3000';
+    const approvalUrl = `${frontendUrl}/approval/${bossApproval.token}`;
+
+    sendBossApprovalEmail(rfp, bossApproval, approvalUrl, company).catch(e => console.error('[Email]', e));
+    await logActivity(req.user.id, `Kirim RFP ke Atasan (${bossEmail})`, 'RFP', rfp.id, rfp.number);
+
+    res.json({ success: true, data: bossApproval, message: `Email persetujuan dikirim ke ${bossEmail}` });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// PUBLIC - boss views RFP details via approval token
+const getBossApproval = async (req, res) => {
+  try {
+    const bossApproval = await prisma.bossApproval.findUnique({
+      where: { token: req.params.token },
+      include: {
+        rfp: {
+          include: { items: true },
+        },
+      },
+    });
+    if (!bossApproval) return res.status(404).json({ success: false, message: 'Link tidak valid' });
+    res.json({ success: true, data: bossApproval });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// PUBLIC - boss decides (approve/reject)
+const bossDecide = async (req, res) => {
+  try {
+    const { action, notes } = req.body; // action: 'APPROVED' | 'REJECTED'
+    if (!['APPROVED', 'REJECTED'].includes(action)) {
+      return res.status(400).json({ success: false, message: 'Action tidak valid' });
+    }
+
+    const bossApproval = await prisma.bossApproval.findUnique({
+      where: { token: req.params.token },
+      include: { rfp: { include: { items: true } } },
+    });
+    if (!bossApproval) return res.status(404).json({ success: false, message: 'Link tidak valid' });
+    if (bossApproval.status !== 'PENDING') {
+      return res.status(409).json({ success: false, message: 'Pengajuan ini sudah diputuskan sebelumnya', status: bossApproval.status });
+    }
+
+    // Update boss approval + RFP status in transaction
+    const [updatedApproval, updatedRfp] = await prisma.$transaction([
+      prisma.bossApproval.update({
+        where: { token: req.params.token },
+        data: { status: action, notes: notes || null, decidedAt: new Date() },
+      }),
+      prisma.expenseRequest.update({
+        where: { id: bossApproval.rfpId },
+        data: { status: action === 'APPROVED' ? 'APPROVED' : 'REJECTED' },
+        include: { items: true },
+      }),
+    ]);
+
+    // Notify requester
+    if (updatedRfp.email) {
+      const company = await prisma.companySetting.findFirst();
+      sendRfpStatusEmail(updatedRfp, action, notes, company).catch(e => console.error('[Email]', e));
+    }
+
+    res.json({ success: true, data: updatedApproval, rfp: updatedRfp });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+module.exports = { getAll, getOne, create, updateStatus, remove, generatePdf, submitAuthenticated, mySubmissions, uploadAttachment, updateTransferInfo, sendToBoss, getBossApproval, bossDecide };

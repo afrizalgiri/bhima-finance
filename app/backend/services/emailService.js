@@ -240,4 +240,94 @@ async function sendWelcomeEmail(user, plainPassword) {
   }
 }
 
-module.exports = { sendRfpStatusEmail, sendOtpEmail, sendWelcomeEmail };
+async function sendBossApprovalEmail(rfp, bossApproval, approvalUrl, company) {
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.log('[Email] SMTP not configured, skipping boss approval email');
+    return;
+  }
+
+  const totalAmount = (rfp.items || []).reduce((s, i) => s + Number(i.amount || 0), 0);
+  const companyName = company?.name || 'Bhima Finance';
+
+  const itemRows = (rfp.items || []).map((item, i) =>
+    `<tr style="background:${i % 2 === 0 ? '#f8fafc' : '#fff'}">
+      <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0">${item.description}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600">${fmt(item.amount)}</td>
+    </tr>`
+  ).join('');
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f0f4f8;font-family:Arial,sans-serif">
+  <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+    <div style="background:#1a3557;padding:24px 32px">
+      <h1 style="margin:0;color:#fff;font-size:18px;font-weight:700">${companyName}</h1>
+      <p style="margin:4px 0 0;color:#93c5fd;font-size:13px">Persetujuan Request for Payment</p>
+    </div>
+    <div style="padding:28px 32px">
+      <p style="color:#374151;font-size:15px;margin-top:0">Yth. ${bossApproval.bossName || 'Pimpinan'},</p>
+      <p style="color:#374151;font-size:14px;line-height:1.6">
+        Terdapat pengajuan <strong>Request for Payment</strong> senilai <strong style="color:#dc2626">${fmt(totalAmount)}</strong>
+        yang memerlukan persetujuan Anda.
+      </p>
+
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:20px 0">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <tr><td style="color:#6b7280;padding:4px 0;width:140px">No. RFP</td><td style="color:#111827;font-weight:600">${rfp.number}</td></tr>
+          <tr><td style="color:#6b7280;padding:4px 0">Pengaju</td><td style="color:#111827">${rfp.name}</td></tr>
+          <tr><td style="color:#6b7280;padding:4px 0">Tanggal</td><td style="color:#111827">${fmtDate(rfp.date)}</td></tr>
+          ${rfp.project ? `<tr><td style="color:#6b7280;padding:4px 0">Proyek</td><td style="color:#111827">${rfp.project}</td></tr>` : ''}
+          ${rfp.detailsOfPayment ? `<tr><td style="color:#6b7280;padding:4px 0">Keperluan</td><td style="color:#111827">${rfp.detailsOfPayment}</td></tr>` : ''}
+          ${rfp.description ? `<tr><td style="color:#6b7280;padding:4px 0">Deskripsi</td><td style="color:#111827">${rfp.description}</td></tr>` : ''}
+        </table>
+      </div>
+
+      <p style="font-size:13px;font-weight:600;color:#1a3557;margin-bottom:8px">Rincian Pembayaran</p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+        <thead>
+          <tr style="background:#1a3557">
+            <th style="padding:10px 12px;text-align:left;color:#fff;font-weight:600">Deskripsi</th>
+            <th style="padding:10px 12px;text-align:right;color:#fff;font-weight:600">Jumlah</th>
+          </tr>
+        </thead>
+        <tbody>${itemRows}</tbody>
+        <tfoot>
+          <tr style="background:#1a3557">
+            <td style="padding:10px 12px;color:#fff;font-weight:700">TOTAL</td>
+            <td style="padding:10px 12px;text-align:right;color:#fff;font-weight:700">${fmt(totalAmount)}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div style="text-align:center;margin:32px 0 8px">
+        <p style="color:#374151;font-size:13px;margin-bottom:16px">Klik tombol di bawah untuk memberikan keputusan Anda:</p>
+        <a href="${approvalUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px">
+          Buka Halaman Persetujuan
+        </a>
+      </div>
+      <p style="color:#9ca3af;font-size:12px;text-align:center">Atau buka link: <a href="${approvalUrl}" style="color:#2563eb">${approvalUrl}</a></p>
+    </div>
+    <div style="padding:16px 32px 24px;border-top:1px solid #e2e8f0">
+      <p style="margin:0;font-size:12px;color:#9ca3af">Email ini dikirim otomatis oleh sistem ${companyName}. Link ini hanya berlaku satu kali.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    await transporter.sendMail({
+      from: `"${companyName}" <${process.env.SMTP_USER}>`,
+      to: bossApproval.bossEmail,
+      subject: `[PERSETUJUAN DIPERLUKAN] RFP ${rfp.number} — ${fmt(totalAmount)} dari ${rfp.name}`,
+      html,
+    });
+    console.log(`[Email] Boss approval email sent to ${bossApproval.bossEmail}`);
+  } catch (e) {
+    console.error('[Email] Failed to send boss approval email:', e.message);
+  }
+}
+
+module.exports = { sendRfpStatusEmail, sendOtpEmail, sendWelcomeEmail, sendBossApprovalEmail };

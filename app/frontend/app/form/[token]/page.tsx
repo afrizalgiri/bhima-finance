@@ -228,11 +228,15 @@ export default function FormTokenPage() {
                   placeholder="Nama proyek..."
                   className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">DESCRIPTION</label>
-                <input type="text" value={form.description} onChange={e => set('description', e.target.value)}
-                  placeholder="Keterangan tambahan..."
-                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <div className="col-span-2">
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  DESKRIPSI / LATAR BELAKANG PENGAJUAN
+                  <span className="ml-1 text-xs font-normal text-gray-400">(5W1H — Apa, Siapa, Kapan, Dimana, Mengapa, Bagaimana)</span>
+                </label>
+                <textarea value={form.description} onChange={e => set('description', e.target.value)}
+                  placeholder="Jelaskan konteks dan tujuan pengajuan ini secara singkat agar dapat dipahami oleh finance dan atasan..."
+                  rows={3}
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
               </div>
             </div>
           </div>
