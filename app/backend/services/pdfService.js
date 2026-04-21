@@ -1,6 +1,7 @@
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
+const { PDFDocument: PdfLib } = require('pdf-lib');
 
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(amount));
@@ -705,8 +706,8 @@ const generateExpensePdf = (expenses, company, filters, signaturesData = [null, 
 // ═══════════════════════════════════════════════════════
 //  REQUEST FOR PAYMENT — FORMAT RFP FORMAL
 // ═══════════════════════════════════════════════════════
-const generateRfpPdf = (rfp, company, signaturesData = [null, null, null, null], attachments = []) => new Promise((resolve, reject) => {
-  const doc = buildPdf((err, buf) => err ? reject(err) : resolve(buf));
+const generateRfpPdf = (rfp, company, signaturesData = [null, null, null, null], attachments = []) => new Promise(async (resolve, reject) => {
+  const doc = new PDFDocument({ size: 'A4', margin: M });
 
   const NAVY = '#1a3557';
   const GOLD = '#c9a84c';
@@ -917,26 +918,72 @@ const generateRfpPdf = (rfp, company, signaturesData = [null, null, null, null],
     }
   });
 
-  // One page for non-image attachments (if any)
-  if (otherAtts.length > 0) {
+  // Collect valid PDF attachments for merging after doc.end()
+  const pdfAtts = otherAtts.filter(a => a.mimeType === 'application/pdf');
+
+  // If there are PDF attachments, add a cover page listing them
+  if (pdfAtts.length > 0) {
     doc.addPage();
     doc.rect(0, 0, PAGE_W, 36).fillColor(NAVY).fill();
     doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#fff')
-      .text('Daftar Lampiran', M, 12, { width: PAGE_W - 2 * M });
+      .text('Lampiran PDF', M, 12, { width: PAGE_W - 2 * M });
 
     let ly2 = 52;
-    otherAtts.forEach((att, idx) => {
+    doc.fontSize(9).font('Helvetica').fillColor('#444')
+      .text('Dokumen PDF berikut dilampirkan setelah halaman ini:', M, ly2);
+    ly2 += 20;
+    pdfAtts.forEach((att, idx) => {
       doc.rect(M, ly2, CW, 28).fillColor(idx % 2 === 0 ? '#f7f9fc' : '#fff').fill();
       doc.rect(M, ly2, CW, 28).strokeColor('#e2e8f0').lineWidth(0.4).stroke();
       doc.fontSize(9).font('Helvetica-Bold').fillColor('#1a3557')
-        .text(`${idx + 1}. ${att.fileName}`, M + 8, ly2 + 7, { width: CW - 16 });
-      doc.fontSize(7.5).font('Helvetica').fillColor('#888')
-        .text(att.mimeType, M + 8, ly2 + 18, { width: CW - 16 });
+        .text(`${idx + 1}. ${att.fileName}`, M + 8, ly2 + 9, { width: CW - 16 });
       ly2 += 30;
     });
   }
 
-  doc.end();
+  // End the main PDFKit doc, then merge PDF attachments using pdf-lib
+  const mainBuf = await new Promise((res2, rej2) => {
+    const chunks = [];
+    doc.on('data', c => chunks.push(c));
+    doc.on('end', () => res2(Buffer.concat(chunks)));
+    doc.on('error', rej2);
+    doc.end();
+  });
+
+  // If no PDF attachments to merge, return main buffer directly
+  if (pdfAtts.length === 0) {
+    resolve(mainBuf);
+    return;
+  }
+
+  // Merge using pdf-lib
+  try {
+    const merged = await PdfLib.create();
+    // Copy main doc pages
+    const mainPdf = await PdfLib.load(mainBuf);
+    const mainPages = await merged.copyPages(mainPdf, mainPdf.getPageIndices());
+    mainPages.forEach(p => merged.addPage(p));
+
+    // Append each PDF attachment
+    for (const att of pdfAtts) {
+      const attPath = path.join(__dirname, '..', att.fileUrl);
+      if (!fs.existsSync(attPath)) continue;
+      try {
+        const attBuf = fs.readFileSync(attPath);
+        const attPdf = await PdfLib.load(attBuf, { ignoreEncryption: true });
+        const attPages = await merged.copyPages(attPdf, attPdf.getPageIndices());
+        attPages.forEach(p => merged.addPage(p));
+      } catch (e) {
+        console.error(`[PDF merge] Skipping ${att.fileName}:`, e.message);
+      }
+    }
+
+    const finalBuf = Buffer.from(await merged.save());
+    resolve(finalBuf);
+  } catch (e) {
+    console.error('[PDF merge] Failed, returning main only:', e.message);
+    resolve(mainBuf);
+  }
 });
 
 // ─── PURCHASE ORDER PDF ───────────────────────────────────────────────────────
