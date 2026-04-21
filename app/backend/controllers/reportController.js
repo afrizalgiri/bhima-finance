@@ -464,22 +464,26 @@ const excelExport = async (req, res) => {
     if (!type || type === 'rfp') {
       const rfps = await prisma.expenseRequest.findMany({
         where: dateRange ? { date: dateRange } : {},
-        include: { items: true },
+        include: { items: true, attachments: true },
         orderBy: { date: 'desc' },
       });
 
+      // Base URL for attachment links
+      const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+
       const ws = wb.addWorksheet('Request for Payment');
       ws.properties.defaultRowHeight = 18;
-      applyTitleBlock(ws, 'LAPORAN REQUEST FOR PAYMENT (RFP)', period, companyName, 8);
+      applyTitleBlock(ws, 'LAPORAN REQUEST FOR PAYMENT (RFP)', period, companyName, 9);
 
       ws.addRow([]);
-      const hRow = ws.addRow(['No', 'Nomor RFP', 'Tanggal', 'Pemohon', 'Proyek', 'Kategori', 'Status', 'Total (Rp)']);
-      applyHeaderRow(ws, hRow, 8);
+      const hRow = ws.addRow(['No', 'Nomor RFP', 'Tanggal', 'Pemohon', 'Proyek', 'Kategori', 'Status', 'Total (Rp)', 'Lampiran']);
+      applyHeaderRow(ws, hRow, 9);
 
       let grandTotal = 0;
       rfps.forEach((r, i) => {
         const total = r.items.reduce((s, it) => s + Number(it.amount), 0);
         grandTotal += total;
+        const attCount = (r.attachments || []).length;
         const row = ws.addRow([
           i + 1,
           r.number,
@@ -489,10 +493,12 @@ const excelExport = async (req, res) => {
           RFP_CATEGORY_LABELS[r.rfpCategory] || r.rfpCategory,
           STATUS_LABELS[r.status] || r.status,
           total,
+          attCount > 0 ? `${attCount} file` : '-',
         ]);
-        applyDataRow(ws, row, i, 8);
+        applyDataRow(ws, row, i, 9);
         ws.getCell(row.number, 8).numFmt = '#,##0';
         ws.getCell(row.number, 8).alignment = { horizontal: 'right', vertical: 'middle' };
+        ws.getCell(row.number, 9).alignment = { horizontal: 'center', vertical: 'middle' };
 
         const sc = ws.getCell(row.number, 7);
         if (r.status === 'APPROVED') sc.font = { ...sc.font, color: { argb: GREEN }, bold: true };
@@ -501,13 +507,52 @@ const excelExport = async (req, res) => {
       });
 
       ws.addRow([]);
-      addSummaryRow(ws, 'TOTAL SELURUH RFP:', grandTotal, 8);
-      addSummaryRow(ws, 'TOTAL DISETUJUI:', rfps.filter(r => r.status === 'APPROVED').reduce((s, r) => s + r.items.reduce((ss, i) => ss + Number(i.amount), 0), 0), 8);
-      addSummaryRow(ws, 'TOTAL PENDING:', rfps.filter(r => r.status === 'PENDING').reduce((s, r) => s + r.items.reduce((ss, i) => ss + Number(i.amount), 0), 0), 8);
+      addSummaryRow(ws, 'TOTAL SELURUH RFP:', grandTotal, 9);
+      addSummaryRow(ws, 'TOTAL DISETUJUI:', rfps.filter(r => r.status === 'APPROVED').reduce((s, r) => s + r.items.reduce((ss, i) => ss + Number(i.amount), 0), 0), 9);
+      addSummaryRow(ws, 'TOTAL PENDING:', rfps.filter(r => r.status === 'PENDING').reduce((s, r) => s + r.items.reduce((ss, i) => ss + Number(i.amount), 0), 0), 9);
 
       ws.columns = [
-        { width: 5 }, { width: 22 }, { width: 14 }, { width: 20 }, { width: 20 }, { width: 22 }, { width: 16 }, { width: 18 },
+        { width: 5 }, { width: 22 }, { width: 14 }, { width: 20 }, { width: 20 },
+        { width: 22 }, { width: 16 }, { width: 18 }, { width: 12 },
       ];
+
+      // ── LAMPIRAN RFP (sheet terpisah) ────────────────────────────
+      const hasAnyAttachment = rfps.some(r => r.attachments && r.attachments.length > 0);
+      if (hasAnyAttachment) {
+        const wsAtt = wb.addWorksheet('Lampiran RFP');
+        wsAtt.properties.defaultRowHeight = 22;
+        applyTitleBlock(wsAtt, 'LAMPIRAN REQUEST FOR PAYMENT', period, companyName, 5);
+
+        wsAtt.addRow([]);
+        const hAtt = wsAtt.addRow(['No', 'Nomor RFP', 'Pemohon', 'Nama File', 'Link (Klik untuk Lihat)']);
+        applyHeaderRow(wsAtt, hAtt, 5);
+
+        let attRowIdx = 0;
+        rfps.forEach(r => {
+          if (!r.attachments || r.attachments.length === 0) return;
+          r.attachments.forEach(att => {
+            const fullUrl = `${baseUrl}${att.fileUrl}`;
+            const row = wsAtt.addRow([
+              ++attRowIdx,
+              r.number,
+              r.name,
+              att.fileName,
+              { text: 'Lihat / Download', hyperlink: fullUrl, tooltip: fullUrl },
+            ]);
+            applyDataRow(wsAtt, row, attRowIdx - 1, 5);
+
+            // Style hyperlink cell
+            const linkCell = wsAtt.getCell(row.number, 5);
+            linkCell.font = { color: { argb: 'FF2563EB' }, underline: true, size: 10 };
+            linkCell.alignment = { vertical: 'middle' };
+            row.height = 22;
+          });
+        });
+
+        wsAtt.columns = [
+          { width: 5 }, { width: 22 }, { width: 20 }, { width: 35 }, { width: 30 },
+        ];
+      }
     }
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
