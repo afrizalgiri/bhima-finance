@@ -59,7 +59,7 @@ const getAll = async (req, res) => {
     const [requests, total] = await Promise.all([
       prisma.expenseRequest.findMany({
         where,
-        include: { items: true },
+        include: { items: true, attachments: true },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * parseInt(limit),
         take: parseInt(limit),

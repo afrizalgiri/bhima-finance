@@ -67,6 +67,10 @@ export default function ExpenseRequestsPage() {
   const [copiedId, setCopiedId] = useState('');
   const [showLinkPanel, setShowLinkPanel] = useState(true);
 
+  // Attachment quick-view
+  const [showAttachModal, setShowAttachModal] = useState(false);
+  const [attachRfp, setAttachRfp] = useState<Rfp | null>(null);
+
   // Bank accounts + transfer info
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [selectedBankId, setSelectedBankId] = useState('');
@@ -719,6 +723,18 @@ export default function ExpenseRequestsPage() {
                       className="p-1.5 hover:bg-green-50 rounded text-green-600" title="Download PDF">
                       <Download size={15} />
                     </button>
+                    {rfp.attachments && rfp.attachments.length > 0 && (
+                      <button
+                        onClick={() => { setAttachRfp(rfp); setShowAttachModal(true); }}
+                        className="relative p-1.5 hover:bg-orange-50 rounded text-orange-500"
+                        title={`${rfp.attachments.length} lampiran`}
+                      >
+                        <Paperclip size={15} />
+                        <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[9px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none">
+                          {rfp.attachments.length}
+                        </span>
+                      </button>
+                    )}
                     {user?.role === 'ADMIN' && (
                       <button onClick={() => handleDelete(rfp.id)} className="p-1.5 hover:bg-red-50 rounded text-red-500" title="Hapus">
                         <Trash2 size={15} />
@@ -922,6 +938,47 @@ export default function ExpenseRequestsPage() {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ATTACHMENT QUICK VIEW ── */}
+      {showAttachModal && attachRfp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl w-full max-w-lg shadow-xl">
+            <div className="p-4 border-b flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <Paperclip size={16} className="text-orange-500" />
+                  Lampiran — {attachRfp.number}
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5">{attachRfp.attachments!.length} file · {attachRfp.name}</p>
+              </div>
+              <button onClick={() => setShowAttachModal(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            </div>
+            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+              {attachRfp.attachments!.map(att => (
+                att.mimeType.startsWith('image/') ? (
+                  <a key={att.id} href={`${API_BASE}${att.fileUrl}`} target="_blank" rel="noreferrer"
+                    className="block rounded-lg border overflow-hidden hover:opacity-90 transition-opacity">
+                    <img src={`${API_BASE}${att.fileUrl}`} alt={att.fileName}
+                      className="w-full max-h-64 object-contain bg-gray-50" />
+                    <div className="px-3 py-1.5 bg-gray-50 border-t text-xs text-gray-500 truncate">{att.fileName}</div>
+                  </a>
+                ) : (
+                  <a key={att.id} href={`${API_BASE}${att.fileUrl}`} target="_blank" rel="noreferrer"
+                    className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center shrink-0">
+                      <span className="text-red-600 font-bold text-xs">PDF</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{att.fileName}</p>
+                      <p className="text-xs text-blue-500 mt-0.5">Klik untuk membuka</p>
+                    </div>
+                  </a>
+                )
+              ))}
             </div>
           </div>
         </div>
