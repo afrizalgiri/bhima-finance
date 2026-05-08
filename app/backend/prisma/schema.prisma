@@ -91,6 +91,8 @@ model CompanySetting {
   docPrefixExpense String?
   docNamePo        String?
   docPrefixPo      String?
+  docNameRfp       String?
+  docPrefixRfp     String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

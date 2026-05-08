@@ -319,12 +319,16 @@ export default function SphPage() {
           <form onSubmit={save} className="space-y-4">
             {/* Header fields */}
             <div className="grid grid-cols-2 gap-3">
-              <div className={editMode ? 'col-span-1' : 'col-span-2'}>
+              <div>
                 <Label>Klien *</Label>
                 <Select value={form.clientId} onChange={e => setForm({...form, clientId: e.target.value})} required className="mt-1">
                   <option value="">-- Pilih Klien --</option>
                   {clients.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Select>
+              </div>
+              <div>
+                <Label>Nomor Surat</Label>
+                <Input value={form.number} onChange={e => setForm({...form, number: e.target.value})} placeholder="Auto-generate jika kosong" className="mt-1" />
               </div>
               {editMode && (
                 <div><Label>Status</Label>

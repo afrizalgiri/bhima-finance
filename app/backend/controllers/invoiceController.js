@@ -45,14 +45,14 @@ const getOne = async (req, res) => {
 
 const create = async (req, res) => {
   try {
-    const { clientId, date, dueDate, items, taxRate = 0, notes, openingText, closingText, headerColor, signatureId } = req.body;
+    const { number: providedNumber, clientId, date, dueDate, items, taxRate = 0, notes, openingText, closingText, headerColor, signatureId } = req.body;
 
     if (!clientId || !items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Client and items required' });
     }
 
     const company = await prisma.companySetting.findFirst();
-    const number = await generateInvoiceNumber(company?.docPrefixInvoice || 'INV');
+    const number = providedNumber?.trim() || await generateInvoiceNumber(company?.docPrefixInvoice || 'INV');
     const subtotal = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
     const taxAmount = subtotal * (taxRate / 100);
     const total = subtotal + taxAmount;

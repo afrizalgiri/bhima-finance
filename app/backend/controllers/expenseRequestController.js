@@ -126,7 +126,8 @@ const create = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Minimal 1 item dengan jumlah harus diisi' });
     }
 
-    const number = await generateRfpNumber('RFP');
+    const company = await prisma.companySetting.findFirst();
+    const number = await generateRfpNumber(company?.docPrefixRfp || 'RFP');
     const rfp = await prisma.expenseRequest.create({
       data: {
         number, date: new Date(date),
@@ -237,7 +238,8 @@ const submitAuthenticated = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Minimal 1 item dengan jumlah harus diisi' });
     }
 
-    const number = await generateRfpNumber('RFP');
+    const company = await prisma.companySetting.findFirst();
+    const number = await generateRfpNumber(company?.docPrefixRfp || 'RFP');
     const rfp = await prisma.expenseRequest.create({
       data: {
         number,

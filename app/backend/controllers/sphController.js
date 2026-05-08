@@ -73,14 +73,14 @@ function calcSubtotal(items) {
 
 const create = async (req, res) => {
   try {
-    const { clientId, date, validUntil, items, taxRate = 0, notes, openingText, closingText, headerColor, signerTitle, signatureId, total: providedTotal, sectionsConfig } = req.body;
+    const { number: providedNumber, clientId, date, validUntil, items, taxRate = 0, notes, openingText, closingText, headerColor, signerTitle, signatureId, total: providedTotal, sectionsConfig } = req.body;
 
     if (!clientId || !items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Client and items required' });
     }
 
     const company = await prisma.companySetting.findFirst();
-    const number = await generateSphNumber(company?.docPrefixSph || 'SPH');
+    const number = providedNumber?.trim() || await generateSphNumber(company?.docPrefixSph || 'SPH');
     const subtotal = calcSubtotal(items);
     const taxAmount = subtotal * (taxRate / 100);
     const total = (providedTotal != null && providedTotal !== '') ? Number(providedTotal) : subtotal + taxAmount;

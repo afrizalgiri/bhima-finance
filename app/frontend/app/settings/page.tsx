@@ -17,6 +17,7 @@ export default function SettingsPage() {
     docNameInvoice: '', docPrefixInvoice: '',
     docNameExpense: '', docPrefixExpense: '',
     docNamePo: '', docPrefixPo: '',
+    docNameRfp: '', docPrefixRfp: '',
   });
   const [logoUrl, setLogoUrl] = useState('');
   const [saving, setSaving] = useState(false);
@@ -38,6 +39,7 @@ export default function SettingsPage() {
           docNameInvoice: d.docNameInvoice || '', docPrefixInvoice: d.docPrefixInvoice || '',
           docNameExpense: d.docNameExpense || '', docPrefixExpense: d.docPrefixExpense || '',
           docNamePo: d.docNamePo || '', docPrefixPo: d.docPrefixPo || '',
+          docNameRfp: d.docNameRfp || '', docPrefixRfp: d.docPrefixRfp || '',
         });
         setLogoUrl(d.logoUrl || '');
       }
@@ -219,6 +221,21 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <p className="text-xs text-gray-400">Contoh nomor: <span className="font-mono">{form.docPrefixPo || 'PO'}/2026/03/0001</span></p>
+              </div>
+
+              <div className="p-3 border border-gray-200 rounded-lg space-y-3">
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Request for Payment (RFP)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Nama Dokumen</Label>
+                    <Input value={form.docNameRfp} onChange={e => setForm({...form, docNameRfp: e.target.value})} placeholder="Request for Payment" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Kode Prefix</Label>
+                    <Input value={form.docPrefixRfp} onChange={e => setForm({...form, docPrefixRfp: e.target.value})} placeholder="RFP" className="mt-1" />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400">Contoh nomor: <span className="font-mono">{form.docPrefixRfp || 'RFP'}/2026/03/0001</span></p>
               </div>
             </div>
           </CardContent>
